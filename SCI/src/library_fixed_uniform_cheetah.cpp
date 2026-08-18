@@ -6,6 +6,7 @@
 
 #include "cheetah/cheetah-api.h"
 #include "defines_uniform.h"
+#include <cstdlib>
 #include <vector>
 
 #include "cheetah/he-linear-tracker.h"
@@ -75,6 +76,12 @@ extern void ElemWiseActModelVectorMult_pt(uint64_t s1, uint64_1D &arr1,
 // cost model, not a protocol: the payload is discarded so the shares from the
 // HE phase -- which are correct -- survive untouched.
 static void HEToMPCConversionOnline(const intType *share, size_t num_elements) {
+  // Set SKIP_HE2MPC_CONVERSION=1 to measure the same build *without* the
+  // preprocessing change: the phase split and all counters stay in place, but
+  // the modelled conversion message is not sent, so communication falls back to
+  // the unmodified protocol's.
+  static const bool skip = std::getenv("SKIP_HE2MPC_CONVERSION") != nullptr;
+  if (skip) return;
   const int num_bytes = static_cast<int>(num_elements * sizeof(intType));
   if (party == SERVER) {
     io->send_data(const_cast<intType *>(share), num_bytes);
