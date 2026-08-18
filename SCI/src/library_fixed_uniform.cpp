@@ -2356,13 +2356,19 @@ void EndComputation() {
   // Preprocessing model: the whole HE evaluation of the linear layers is
   // preprocessing; the online phase is the HE->MPC conversion plus every
   // OT-based non-linear layer.
+  // Linear-layer preprocessing that happens inside the measured execution.
   const uint64_t linear_preprocessing_time_microseconds =
-      1000ULL * (ConvTimeInMilliSec + MatMulTimeInMilliSec + BatchNormInMilliSec +
-                 ConvOffTimeInMilliSec);
+      1000ULL * (ConvTimeInMilliSec + MatMulTimeInMilliSec + BatchNormInMilliSec);
+  // The filter/NTT encoding runs before StartComputation() starts the clock, so
+  // it counts as preprocessing but is not part of execTimeInMilliSec and must
+  // not be subtracted from it when deriving the online time.
+  const uint64_t offline_encoding_time_microseconds =
+      1000ULL * ConvOffTimeInMilliSec;
   const uint64_t linear_preprocessing_sent_bytes =
       ConvCommSent + MatMulCommSent + BatchNormCommSent;
   const uint64_t total_preprocessing_time_microseconds =
-      OTSetupTimeInMicroSec + linear_preprocessing_time_microseconds;
+      OTSetupTimeInMicroSec + offline_encoding_time_microseconds +
+      linear_preprocessing_time_microseconds;
   const uint64_t total_preprocessing_sent_bytes =
       OTSetupCommSent + linear_preprocessing_sent_bytes;
   const uint64_t exec_time_microseconds = 1000ULL * execTimeInMilliSec;
