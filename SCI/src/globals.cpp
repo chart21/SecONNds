@@ -83,6 +83,8 @@ sci::PRG128 *prgInstanceArr[MAX_THREADS];
 std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
 uint64_t comm_threads[MAX_THREADS];
 uint64_t rounds_threads[MAX_THREADS];
+uint64_t seq_rounds_threads[MAX_THREADS];
+uint64_t SequentialRounds = 0;
 uint64_t ConvRounds = 0;
 uint64_t MatMulRounds = 0;
 uint64_t BatchNormRounds = 0;

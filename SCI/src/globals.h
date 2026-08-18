@@ -116,6 +116,8 @@ extern sci::PRG128 *prgInstanceArr[MAX_THREADS];
 extern std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
 extern uint64_t comm_threads[MAX_THREADS];
 extern uint64_t rounds_threads[MAX_THREADS];
+extern uint64_t seq_rounds_threads[MAX_THREADS];
+extern uint64_t SequentialRounds;
 extern uint64_t ConvRounds;
 extern uint64_t MatMulRounds;
 extern uint64_t BatchNormRounds;

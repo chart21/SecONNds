@@ -265,6 +265,22 @@ inline uint64_t all1Mask(int x){
             __ioStartTracker[__thrdCtr] = ::ioArr[__thrdCtr]->counter;\
         }
 
+// One segment of this party's dependency chain: threads inside a segment run
+// concurrently, so the segment costs what its busiest thread waited for, and
+// segments themselves are sequential. Summing these gives the round count that
+// actually sits on the critical path.
+#define ACCUMULATE_SEQ_ROUNDS { uint64_t __segMax = 0;\
+        for(int __t = 0; __t < ::num_threads; __t++){\
+            uint64_t __d = ::ioArr[__t]->num_recv_rounds - ::seq_rounds_threads[__t];\
+            if (__d > __segMax) __segMax = __d;\
+            ::seq_rounds_threads[__t] = ::ioArr[__t]->num_recv_rounds;\
+        }\
+        ::SequentialRounds += __segMax; }
+#define RESET_SEQ_ROUNDS for(int __t = 0; __t < ::num_threads; __t++){\
+            ::seq_rounds_threads[__t] = ::ioArr[__t]->num_recv_rounds;\
+        }\
+        ::SequentialRounds = 0;
+
 #define INIT_ALL_ROUNDS uint64_t __roundStartTracker[::num_threads];\
         for(int __thrdCtr = 0; __thrdCtr < ::num_threads; __thrdCtr++){\
             __roundStartTracker[__thrdCtr] = ::ioArr[__thrdCtr]->num_recv_rounds;\

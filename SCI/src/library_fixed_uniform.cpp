@@ -2320,6 +2320,7 @@ void StartComputation(bool use_heliks, bool use_low_round) {
     // part of totalComm.
     SetupCommSent += temp;
     SetupRounds += rounds_threads[i];
+    seq_rounds_threads[i] = rounds_threads[i];
     std::cout << "Thread i = " << i << ", total data sent till now = " << temp
               << std::endl;
   }
@@ -2415,12 +2416,15 @@ void EndComputation() {
             << std::endl;
   std::cout << "Number of rounds = " << ioArr[0]->num_rounds - num_rounds
             << std::endl;
+  ACCUMULATE_SEQ_ROUNDS;  // close the trailing segment
   std::cout << "Communication rounds (waits for the peer) = " << totalRounds
             << " summed over " << num_threads << " threads" << std::endl;
   // Threads run concurrently, so the latency-relevant figure is the busiest
   // thread, not the sum: that is what sits on the critical path.
   std::cout << "  critical-path rounds (max over threads) = " << maxThreadRounds
             << std::endl;
+  std::cout << "  sequential rounds (this party's dependency chain) = "
+            << SequentialRounds << std::endl;
   std::cout << "  preprocessing rounds = " << total_preprocessing_rounds
             << " (of which setup before the clock " << SetupRounds << ")"
             << std::endl;
