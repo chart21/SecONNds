@@ -1,6 +1,8 @@
 // Author: Wen-jie Lu on 2021/9/14.
 #include "cheetah/cheetah-api.h"
 
+#include "cheetah/he-linear-tracker.h"
+
 #include <seal/seal.h>
 // #include <troy/troy_cuda.cuh>
 
@@ -378,8 +380,10 @@ void CheetahLinear::fc(const Tensor<uint64_t> &input_vector,
     }
 
     std::vector<seal::Ciphertext> ct_buff;
-    recv_encrypted_vector(io_, *context_, ct_buff);
-    code = impl.decryptToVector(ct_buff, meta, out_vec_share, nthreads);
+{
+      sci::HELinearOnlineScope online(io_);
+      recv_encrypted_vector(io_, *context_, ct_buff);
+    }    code = impl.decryptToVector(ct_buff, meta, out_vec_share, nthreads);
 
     if (code != Code::OK) {
       throw std::runtime_error("CheetahLinear::fc decryptToVector [" +
@@ -416,8 +420,10 @@ void CheetahLinear::fc(const Tensor<uint64_t> &input_vector,
       throw std::runtime_error("CheetahLinear::fc matmul2D error [" +
                                CodeMessage(code) + "]");
     }
-    send_encrypted_vector(io_, out_vec_share0);
-  }
+{
+      sci::HELinearOnlineScope online(io_);
+      send_encrypted_vector(io_, out_vec_share0);
+    }  }
 }
 
 void CheetahLinear::conv2d(const Tensor<uint64_t> &in_tensor,
@@ -454,8 +460,10 @@ void CheetahLinear::conv2d(const Tensor<uint64_t> &in_tensor,
 
     // Wait for result
     std::vector<seal::Ciphertext> ct_buff;
-    recv_encrypted_vector(io_, *context_, ct_buff, true);
-
+{
+      sci::HELinearOnlineScope online(io_);
+      recv_encrypted_vector(io_, *context_, ct_buff, true);
+    }
     code = impl.decryptToTensor(ct_buff, meta, out_tensor, nthreads_);
     if (code != Code::OK) {
       throw std::runtime_error("CheetahLinear::conv2d decryptToTensor " +
@@ -488,8 +496,10 @@ void CheetahLinear::conv2d(const Tensor<uint64_t> &in_tensor,
       throw std::runtime_error("CheetahLinear::conv2d conv2DSS: " +
                                CodeMessage(code));
     }
-    send_encrypted_vector(io_, out_ct);
-  }
+{
+      sci::HELinearOnlineScope online(io_);
+      send_encrypted_vector(io_, out_ct);
+    }  }
 }
 
 void CheetahLinear::conv2d_offline(const std::vector<Tensor<uint64_t>> &filters,
@@ -563,8 +573,10 @@ void CheetahLinear::conv2d_online(const Tensor<uint64_t> &in_tensor,
 
     // Wait for result
     std::vector<seal::Ciphertext> ct_buff;
-    recv_encrypted_vector(io_, *context_, ct_buff, true);
-
+{
+      sci::HELinearOnlineScope online(io_);
+      recv_encrypted_vector(io_, *context_, ct_buff, true);
+    }
     code = impl.decryptToTensor(ct_buff, meta, out_tensor, nthreads_);
     if (code != Code::OK) {
       throw std::runtime_error("CheetahLinear::conv2d decryptToTensor " +
@@ -597,8 +609,10 @@ void CheetahLinear::conv2d_online(const Tensor<uint64_t> &in_tensor,
       throw std::runtime_error("CheetahLinear::conv2d conv2DSS: " +
                                CodeMessage(code));
     }
-    send_encrypted_vector(io_, out_ct);
-  }
+{
+      sci::HELinearOnlineScope online(io_);
+      send_encrypted_vector(io_, out_ct);
+    }  }
 }
 
 void CheetahLinear::bn(const Tensor<uint64_t> &input_vector,
@@ -625,8 +639,10 @@ void CheetahLinear::bn(const Tensor<uint64_t> &input_vector,
     }
 
     std::vector<seal::Ciphertext> ct_buff;
-    code = bn_impl_.recvEncryptVector(io_, ct_buff, meta);
-    if (code != Code::OK) {
+{
+      sci::HELinearOnlineScope online(io_);
+      code = bn_impl_.recvEncryptVector(io_, ct_buff, meta);
+    }    if (code != Code::OK) {
       throw std::runtime_error("bn recvEncryptVector [" + CodeMessage(code) +
                                "]");
     }
@@ -672,8 +688,10 @@ void CheetahLinear::bn(const Tensor<uint64_t> &input_vector,
       throw std::runtime_error("bn failed [" + CodeMessage(code) + "]");
     }
 
-    code = bn_impl_.sendEncryptVector(io_, out_ct, meta);
-    if (code != Code::OK) {
+{
+      sci::HELinearOnlineScope online(io_);
+      code = bn_impl_.sendEncryptVector(io_, out_ct, meta);
+    }    if (code != Code::OK) {
       throw std::runtime_error("bn sendEncryptVector [" + CodeMessage(code) +
                                "]");
     }
@@ -700,8 +718,10 @@ void CheetahLinear::bn_direct(const Tensor<uint64_t> &input_tensor,
     }
 
     std::vector<seal::Ciphertext> ct_buff;
-    recv_encrypted_vector(io_, *context_, ct_buff);
-
+{
+      sci::HELinearOnlineScope online(io_);
+      recv_encrypted_vector(io_, *context_, ct_buff);
+    }
     code = bn_impl_.decryptToTensor(ct_buff, meta, out_tensor, nthreads_);
     if (code != Code::OK) {
       throw std::runtime_error("bn_direct decryptToTensor [" +
@@ -732,8 +752,10 @@ void CheetahLinear::bn_direct(const Tensor<uint64_t> &input_tensor,
     if (code != Code::OK) {
       throw std::runtime_error("bn_direct failed [" + CodeMessage(code) + "]");
     }
-    send_encrypted_vector(io_, out_ct);
-  }
+{
+      sci::HELinearOnlineScope online(io_);
+      send_encrypted_vector(io_, out_ct);
+    }  }
 }
 
 }  // namespace gemini

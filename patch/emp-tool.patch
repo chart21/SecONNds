@@ -21,3 +21,13 @@ index 9ec8165..cce8294 100644
  #include "emp-tool/circuits/aes_128_ctr.h"
  
  #include "emp-tool/utils/block.h"
+diff --git a/emp-tool/utils/block.h b/emp-tool/utils/block.h
+index 0130789..36fd566 100644
+--- a/emp-tool/utils/block.h
++++ b/emp-tool/utils/block.h
+@@ -23,4 +23,5 @@
+ #include <assert.h>
++#include <cstdint>
+ #include <cstring>
+ #include <iostream>
+ #include <iomanip>

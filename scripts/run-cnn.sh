@@ -177,8 +177,10 @@ if [[ "$*" == *"--disable_buffer"* ]] || [[ "$*" == *"-nobuff"* ]]; then
   echo -e " "
 fi
 
-# create a data/ to store the Ferret output
+# create a data/ to store the Ferret output; always start empty so the pre-OT
+# material is regenerated and counted as preprocessing
 mkdir -p data
+rm -rf data/*
 
 if [[ "$*" == *"-debug"* ]]; then
   echo -e "${GREEN}-debug${NC}: Running in Debug mode (with GDB)."

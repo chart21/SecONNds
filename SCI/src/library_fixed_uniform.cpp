@@ -2282,12 +2282,32 @@ void StartComputation(bool use_heliks, bool use_low_round) {
 //   math = mathArr[0];
 // #endif
 
-  if (party == sci::ALICE) {
-    iknpOT->setup_send();
-    iknpOTRoleReversed->setup_recv();
-  } else if (party == sci::BOB) {
-    iknpOT->setup_recv();
-    iknpOTRoleReversed->setup_send();
+  {
+    // The one-time OT setup runs before the IO counters below are snapshotted,
+    // so it is not part of totalComm. Measure it separately so it can be
+    // reported as part of preprocessing.
+    const auto setup_start = std::chrono::high_resolution_clock::now();
+    uint64_t setup_sent_before = 0;
+    for (int i = 0; i < num_threads; i++) setup_sent_before += ioArr[i]->counter;
+
+    if (party == sci::ALICE) {
+      iknpOT->setup_send();
+      iknpOTRoleReversed->setup_recv();
+    } else if (party == sci::BOB) {
+      iknpOT->setup_recv();
+      iknpOTRoleReversed->setup_send();
+    }
+
+    uint64_t setup_sent_after = 0;
+    for (int i = 0; i < num_threads; i++) setup_sent_after += ioArr[i]->counter;
+    OTSetupCommSent = setup_sent_after - setup_sent_before;
+    OTSetupTimeInMicroSec =
+        std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::high_resolution_clock::now() - setup_start)
+            .count();
+    std::cout << "OT setup: runtime = [" << (OTSetupTimeInMicroSec / 1000000.0)
+              << "] seconds, communication sent = ["
+              << (OTSetupCommSent / 1024. / 1024.) << "] MiB" << std::endl;
   }
   
   for (int i = 0; i < num_threads; i++) {
@@ -2328,7 +2348,32 @@ void EndComputation() {
               << std::endl;
     totalComm += (temp - comm_threads[i]);
   }
-  uint64_t totalCommClient;
+  uint64_t totalCommClient = 0;
+  uint64_t totalPreprocessingSentClient = 0;
+  uint64_t totalOnlineSentClient = 0;
+  uint64_t total_preprocessing_comm = 0;
+  uint64_t total_online_comm = 0;
+  // Preprocessing model: the whole HE evaluation of the linear layers is
+  // preprocessing; the online phase is the HE->MPC conversion plus every
+  // OT-based non-linear layer.
+  const uint64_t linear_preprocessing_time_microseconds =
+      1000ULL * (ConvTimeInMilliSec + MatMulTimeInMilliSec + BatchNormInMilliSec +
+                 ConvOffTimeInMilliSec);
+  const uint64_t linear_preprocessing_sent_bytes =
+      ConvCommSent + MatMulCommSent + BatchNormCommSent;
+  const uint64_t total_preprocessing_time_microseconds =
+      OTSetupTimeInMicroSec + linear_preprocessing_time_microseconds;
+  const uint64_t total_preprocessing_sent_bytes =
+      OTSetupCommSent + linear_preprocessing_sent_bytes;
+  const uint64_t exec_time_microseconds = 1000ULL * execTimeInMilliSec;
+  const uint64_t total_online_time_microseconds =
+      exec_time_microseconds > linear_preprocessing_time_microseconds
+          ? exec_time_microseconds - linear_preprocessing_time_microseconds
+          : 0;
+  const uint64_t total_online_sent_bytes =
+      totalComm > linear_preprocessing_sent_bytes
+          ? totalComm - linear_preprocessing_sent_bytes
+          : 0;
   std::cout << "------------------------------------------------------\n";
   std::cout << "------------------------------------------------------\n";
   std::cout << "------------------------------------------------------\n";
@@ -2336,25 +2381,77 @@ void EndComputation() {
             << " milliseconds.\n";
   std::cout << "Total data sent = " << (totalComm / (1.0 * (1ULL << 20)))
             << " MiB." << std::endl;
+  std::cout << "Total data sent incl. one-time OT setup = "
+            << ((totalComm + OTSetupCommSent) / (1.0 * (1ULL << 20))) << " MiB."
+            << std::endl;
   std::cout << "Number of rounds = " << ioArr[0]->num_rounds - num_rounds
             << std::endl;
   if (party == SERVER) {
     io->recv_data(&totalCommClient, sizeof(uint64_t));
+    io->recv_data(&totalPreprocessingSentClient, sizeof(uint64_t));
+    io->recv_data(&totalOnlineSentClient, sizeof(uint64_t));
+    total_preprocessing_comm =
+        total_preprocessing_sent_bytes + totalPreprocessingSentClient;
+    total_online_comm = total_online_sent_bytes + totalOnlineSentClient;
     std::cout << "Total comm (sent+received) = "
               << ((totalComm + totalCommClient) / (1.0 * (1ULL << 20)))
               << " MiB." << std::endl;
+    std::cout << "Total comm incl. one-time OT setup (sent+received) = "
+              << ((total_preprocessing_comm + total_online_comm) /
+                  (1.0 * (1ULL << 20)))
+              << " MiB." << std::endl;
   } else if (party == CLIENT) {
     io->send_data(&totalComm, sizeof(uint64_t));
+    io->send_data(&total_preprocessing_sent_bytes, sizeof(uint64_t));
+    io->send_data(&total_online_sent_bytes, sizeof(uint64_t));
     std::cout << "Total comm (sent+received) = (see SERVER OUTPUT)"
               << std::endl;
+    std::cout << "Total comm incl. one-time OT setup (sent+received) = (see "
+                 "SERVER OUTPUT)"
+              << std::endl;
   }
+  std::cout << "Total preprocessing: runtime = ["
+            << (total_preprocessing_time_microseconds / 1000000.0)
+            << "] seconds, communication sent = ["
+            << (total_preprocessing_sent_bytes / 1024. / 1024.) << "] MiB";
+  if (party == SERVER) {
+    std::cout << ", communication (sent+received) = ["
+              << (total_preprocessing_comm / 1024. / 1024.) << "] MiB";
+  } else if (party == CLIENT) {
+    std::cout << ", communication (sent+received) = (see SERVER OUTPUT)";
+  }
+  std::cout << std::endl;
+  std::cout << "Total online: runtime = ["
+            << (total_online_time_microseconds / 1000000.0)
+            << "] seconds, communication sent = ["
+            << (total_online_sent_bytes / 1024. / 1024.) << "] MiB";
+  if (party == SERVER) {
+    std::cout << ", communication (sent+received) = ["
+              << (total_online_comm / 1024. / 1024.) << "] MiB";
+  } else if (party == CLIENT) {
+    std::cout << ", communication (sent+received) = (see SERVER OUTPUT)";
+  }
+  std::cout << std::endl;
+  std::cout << "OT setup: runtime = ["
+            << (OTSetupTimeInMicroSec / 1000000.0)
+            << "] seconds, communication sent = ["
+            << (OTSetupCommSent / 1024. / 1024.) << "] MiB" << std::endl;
   std::cout << "------------------------------------------------------\n";
 
 #ifdef LOG_LAYERWISE
   std::cout << "Total time in Conv Offline = " << (ConvOffTimeInMilliSec / 1000.0)
             << " seconds." << std::endl;
-  std::cout << "Total time in Conv = " << (ConvTimeInMilliSec / 1000.0)
-            << " seconds." << std::endl;
+  std::cout << "Total time in Conv (preprocessing) = "
+            << (ConvTimeInMilliSec / 1000.0) << " seconds." << std::endl;
+  std::cout << "Total CONV online runtime = "
+            << (ConvOnlineTimeInMicroSec / 1000000.0) << " seconds."
+            << std::endl;
+  std::cout << "Total FC online runtime = "
+            << (MatMulOnlineTimeInMicroSec / 1000000.0) << " seconds."
+            << std::endl;
+  std::cout << "Total BN online runtime = "
+            << (BatchNormOnlineTimeInMicroSec / 1000000.0) << " seconds."
+            << std::endl;
   std::cout << "Total time in MatMul = " << (MatMulTimeInMilliSec / 1000.0)
             << " seconds." << std::endl;
   std::cout << "Total time in BatchNorm = " << (BatchNormInMilliSec / 1000.0)
@@ -2387,8 +2484,17 @@ void EndComputation() {
   std::cout << "Total time in NormaliseL2 = "
             << (NormaliseL2TimeInMilliSec / 1000.0) << " seconds." << std::endl;
   std::cout << "------------------------------------------------------\n";
-  std::cout << "Conv data sent = " << ((ConvCommSent) / (1.0 * (1ULL << 20)))
-            << " MiB." << std::endl;
+  std::cout << "Conv preprocessing data sent = "
+            << ((ConvCommSent) / (1.0 * (1ULL << 20))) << " MiB." << std::endl;
+  std::cout << "Conv online data sent = "
+            << ((ConvOnlineCommSent) / (1.0 * (1ULL << 20))) << " MiB."
+            << std::endl;
+  std::cout << "MatMul online data sent = "
+            << ((MatMulOnlineCommSent) / (1.0 * (1ULL << 20))) << " MiB."
+            << std::endl;
+  std::cout << "BatchNorm online data sent = "
+            << ((BatchNormOnlineCommSent) / (1.0 * (1ULL << 20))) << " MiB."
+            << std::endl;
   std::cout << "MatMul data sent = "
             << ((MatMulCommSent) / (1.0 * (1ULL << 20))) << " MiB."
             << std::endl;
@@ -2463,6 +2569,27 @@ void EndComputation() {
     io->recv_data(&TanhCommSentClient, sizeof(uint64_t));
     io->recv_data(&SqrtCommSentClient, sizeof(uint64_t));
     io->recv_data(&NormaliseL2CommSentClient, sizeof(uint64_t));
+    uint64_t ConvOnlineCommSentClient = 0;
+    uint64_t MatMulOnlineCommSentClient = 0;
+    uint64_t BatchNormOnlineCommSentClient = 0;
+    io->recv_data(&ConvOnlineCommSentClient, sizeof(uint64_t));
+    io->recv_data(&MatMulOnlineCommSentClient, sizeof(uint64_t));
+    io->recv_data(&BatchNormOnlineCommSentClient, sizeof(uint64_t));
+    std::cout << "Conv preprocessing data (sent+received) = "
+              << ((ConvCommSent + ConvCommSentClient) / (1.0 * (1ULL << 20)))
+              << " MiB." << std::endl;
+    std::cout << "Conv online data (sent+received) = "
+              << ((ConvOnlineCommSent + ConvOnlineCommSentClient) /
+                  (1.0 * (1ULL << 20)))
+              << " MiB." << std::endl;
+    std::cout << "MatMul online data (sent+received) = "
+              << ((MatMulOnlineCommSent + MatMulOnlineCommSentClient) /
+                  (1.0 * (1ULL << 20)))
+              << " MiB." << std::endl;
+    std::cout << "BatchNorm online data (sent+received) = "
+              << ((BatchNormOnlineCommSent + BatchNormOnlineCommSentClient) /
+                  (1.0 * (1ULL << 20)))
+              << " MiB." << std::endl;
 
     std::cout << "Conv data (sent+received) = "
               << ((ConvCommSent + ConvCommSentClient) / (1.0 * (1ULL << 20)))
@@ -2589,6 +2716,9 @@ void EndComputation() {
     io->send_data(&TanhCommSent, sizeof(uint64_t));
     io->send_data(&SqrtCommSent, sizeof(uint64_t));
     io->send_data(&NormaliseL2CommSent, sizeof(uint64_t));
+    io->send_data(&ConvOnlineCommSent, sizeof(uint64_t));
+    io->send_data(&MatMulOnlineCommSent, sizeof(uint64_t));
+    io->send_data(&BatchNormOnlineCommSent, sizeof(uint64_t));
   }
 #endif
 }

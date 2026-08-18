@@ -86,6 +86,14 @@ uint64_t num_rounds;
 
 #ifdef LOG_LAYERWISE
 uint64_t ConvOffTimeInMilliSec = 0;
+uint64_t ConvOnlineTimeInMicroSec = 0;
+uint64_t MatMulOnlineTimeInMicroSec = 0;
+uint64_t BatchNormOnlineTimeInMicroSec = 0;
+uint64_t ConvOnlineCommSent = 0;
+uint64_t MatMulOnlineCommSent = 0;
+uint64_t BatchNormOnlineCommSent = 0;
+uint64_t OTSetupCommSent = 0;
+uint64_t OTSetupTimeInMicroSec = 0;
 uint64_t ConvTimeInMilliSec = 0;
 uint64_t MatAddTimeInMilliSec = 0;
 uint64_t BatchNormInMilliSec = 0;

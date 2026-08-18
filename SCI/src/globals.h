@@ -119,6 +119,14 @@ extern uint64_t num_rounds;
 
 #ifdef LOG_LAYERWISE
 extern uint64_t ConvOffTimeInMilliSec;
+extern uint64_t ConvOnlineTimeInMicroSec;
+extern uint64_t MatMulOnlineTimeInMicroSec;
+extern uint64_t BatchNormOnlineTimeInMicroSec;
+extern uint64_t ConvOnlineCommSent;
+extern uint64_t MatMulOnlineCommSent;
+extern uint64_t BatchNormOnlineCommSent;
+extern uint64_t OTSetupCommSent;
+extern uint64_t OTSetupTimeInMicroSec;
 extern uint64_t ConvTimeInMilliSec;
 extern uint64_t MatAddTimeInMilliSec;
 extern uint64_t BatchNormInMilliSec;

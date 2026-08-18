@@ -6,6 +6,9 @@
 
 #include "cheetah/cheetah-api.h"
 #include "defines_uniform.h"
+#include <vector>
+
+#include "cheetah/he-linear-tracker.h"
 #include "globals.h"
 
 // #define VERIFY_LAYERWISE
@@ -62,11 +65,32 @@ extern void ElemWiseActModelVectorMult_pt(uint64_t s1, uint64_1D &arr1,
                                           uint64_1D &arr2, uint64_1D &outArr);
 #endif
 
+// Online phase of the preprocessing model: with the homomorphic evaluation
+// moved offline, converting the HE result into MPC shares costs one ring
+// element per output element, SERVER -> CLIENT.
+//
+// Like Cheetah, SecONNds does not need this step -- the BFV plaintext modulus
+// is the 2^k ring, so the linear layer already yields ring shares and the
+// conversion is fused into the masked ciphertext return. This is therefore a
+// cost model, not a protocol: the payload is discarded so the shares from the
+// HE phase -- which are correct -- survive untouched.
+static void HEToMPCConversionOnline(const intType *share, size_t num_elements) {
+  const int num_bytes = static_cast<int>(num_elements * sizeof(intType));
+  if (party == SERVER) {
+    io->send_data(const_cast<intType *>(share), num_bytes);
+  } else {
+    static thread_local std::vector<intType> discard;
+    if (discard.size() < num_elements) discard.resize(num_elements);
+    io->recv_data(discard.data(), num_bytes);
+  }
+}
+
 void MatMul2D(int32_t d0, int32_t d1, int32_t d2, const intType *mat_A,
               const intType *mat_B, intType *mat_C, bool is_A_weight_matrix) {
 #ifdef LOG_LAYERWISE
   INIT_ALL_IO_DATA_SENT;
   INIT_TIMER;
+  const auto he_online_before = sci::GetHELinearOnlineMetrics();
 #endif
 
   using namespace gemini;
@@ -126,13 +150,42 @@ void MatMul2D(int32_t d0, int32_t d1, int32_t d2, const intType *mat_A,
                                meta.weight_shape.num_elements());
   }
 #ifdef LOG_LAYERWISE
+  // Preprocessing model: the whole HE evaluation is preprocessing, the online
+  // phase is the modelled conversion below. The result-ciphertext transfer
+  // inside the CheetahLinear call is reported separately as a diagnostic.
   auto temp = TIMER_TILL_NOW;
-  MatMulTimeInMilliSec += temp;
-  std::cout << "Time in sec for current matmul = " << (temp / 1000.0)
-            << std::endl;
   uint64_t curComm;
   FIND_ALL_IO_TILL_NOW(curComm);
+  const auto he_ct_return = sci::HELinearOnlineDifference(
+      sci::GetHELinearOnlineMetrics(), he_online_before);
+  MatMulTimeInMilliSec += temp;
   MatMulCommSent += curComm;
+  std::cout << "Current FC preprocessing: runtime = [" << (temp / 1000.0)
+            << "] seconds, communication sent = ["
+            << (curComm / 1024. / 1024.) << "] MB (of which result-ciphertext "
+            << "transfer [" << (he_ct_return.sent_bytes / 1024. / 1024.)
+            << "] MB)" << std::endl;
+  RESET_ALL_IO;
+  START_TIMER;
+#endif
+
+  HEToMPCConversionOnline(mat_C, static_cast<size_t>(d0) * d2);
+
+#ifdef LOG_LAYERWISE
+  const uint64_t online_time =
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::high_resolution_clock::now() - start_timer)
+          .count();
+  uint64_t online_comm;
+  {
+    FIND_ALL_IO_TILL_NOW(online_comm);
+  }
+  MatMulOnlineTimeInMicroSec += online_time;
+  MatMulOnlineCommSent += online_comm;
+  std::cout << "Current FC online HE->MPC conversion: runtime = ["
+            << (online_time / 1000000.0) << "] seconds, communication sent = ["
+            << (online_comm / 1024. / 1024.)
+            << "] MB (1 ring element/output, SERVER -> CLIENT)" << std::endl;
 #endif
 
 #if VERIFY_LAYERWISE
@@ -218,6 +271,7 @@ void Conv2DWrapper(signedIntType N, signedIntType H, signedIntType W,
 #ifdef LOG_LAYERWISE
   INIT_ALL_IO_DATA_SENT;
   INIT_TIMER;
+  const auto he_online_before = sci::GetHELinearOnlineMetrics();
 #endif
 
   if (zPadWLeft < zPadWRight) {
@@ -294,16 +348,42 @@ void Conv2DWrapper(signedIntType N, signedIntType H, signedIntType W,
   }
 
 #ifdef LOG_LAYERWISE
+  // Preprocessing model: the whole HE evaluation is preprocessing, the online
+  // phase is the modelled conversion below. The result-ciphertext transfer
+  // inside the CheetahLinear call is reported separately as a diagnostic.
   auto temp = TIMER_TILL_NOW;
-  ConvTimeInMilliSec += temp;
-  const int64_t nbytes_sent = cheetah_linear->io_counter() - io_counter;
-  std::cout << "Time in sec for current conv = [" << (temp / 1000.0)
-            << "] sent [" << (nbytes_sent / 1024. / 1024.) << "] MB"
-            << std::endl;
-
   uint64_t curComm;
   FIND_ALL_IO_TILL_NOW(curComm);
+  const auto he_ct_return = sci::HELinearOnlineDifference(
+      sci::GetHELinearOnlineMetrics(), he_online_before);
+  ConvTimeInMilliSec += temp;
   ConvCommSent += curComm;
+  std::cout << "Current CONV preprocessing: runtime = [" << (temp / 1000.0)
+            << "] seconds, communication sent = ["
+            << (curComm / 1024. / 1024.) << "] MB (of which result-ciphertext "
+            << "transfer [" << (he_ct_return.sent_bytes / 1024. / 1024.)
+            << "] MB)" << std::endl;
+  RESET_ALL_IO;
+  START_TIMER;
+#endif
+
+  HEToMPCConversionOnline(outArr, static_cast<size_t>(N) * newH * newW * CO);
+
+#ifdef LOG_LAYERWISE
+  const uint64_t online_time =
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::high_resolution_clock::now() - start_timer)
+          .count();
+  uint64_t online_comm;
+  {
+    FIND_ALL_IO_TILL_NOW(online_comm);
+  }
+  ConvOnlineTimeInMicroSec += online_time;
+  ConvOnlineCommSent += online_comm;
+  std::cout << "Current CONV online HE->MPC conversion: runtime = ["
+            << (online_time / 1000000.0) << "] seconds, communication sent = ["
+            << (online_comm / 1024. / 1024.)
+            << "] MB (1 ring element/output, SERVER -> CLIENT)" << std::endl;
 #endif
 
 #if VERIFY_LAYERWISE
@@ -430,6 +510,7 @@ void Conv2DWrapper(bool conv_ntt, signedIntType N, signedIntType H, signedIntTyp
 #ifdef LOG_LAYERWISE
   INIT_ALL_IO_DATA_SENT;
   INIT_TIMER;
+  const auto he_online_before = sci::GetHELinearOnlineMetrics();
 #endif
 
   if (zPadWLeft < zPadWRight) {
@@ -506,16 +587,42 @@ void Conv2DWrapper(bool conv_ntt, signedIntType N, signedIntType H, signedIntTyp
   }
 
 #ifdef LOG_LAYERWISE
+  // Preprocessing model: the whole HE evaluation is preprocessing, the online
+  // phase is the modelled conversion below. The result-ciphertext transfer
+  // inside the CheetahLinear call is reported separately as a diagnostic.
   auto temp = TIMER_TILL_NOW;
-  ConvTimeInMilliSec += temp;
-  const int64_t nbytes_sent = cheetah_linear->io_counter() - io_counter;
-  std::cout << "Time in sec for current conv = [" << (temp / 1000.0)
-            << "] sent [" << (nbytes_sent / 1024. / 1024.) << "] MB"
-            << std::endl;
-
   uint64_t curComm;
   FIND_ALL_IO_TILL_NOW(curComm);
+  const auto he_ct_return = sci::HELinearOnlineDifference(
+      sci::GetHELinearOnlineMetrics(), he_online_before);
+  ConvTimeInMilliSec += temp;
   ConvCommSent += curComm;
+  std::cout << "Current CONV preprocessing: runtime = [" << (temp / 1000.0)
+            << "] seconds, communication sent = ["
+            << (curComm / 1024. / 1024.) << "] MB (of which result-ciphertext "
+            << "transfer [" << (he_ct_return.sent_bytes / 1024. / 1024.)
+            << "] MB)" << std::endl;
+  RESET_ALL_IO;
+  START_TIMER;
+#endif
+
+  HEToMPCConversionOnline(outArr, static_cast<size_t>(N) * newH * newW * CO);
+
+#ifdef LOG_LAYERWISE
+  const uint64_t online_time =
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::high_resolution_clock::now() - start_timer)
+          .count();
+  uint64_t online_comm;
+  {
+    FIND_ALL_IO_TILL_NOW(online_comm);
+  }
+  ConvOnlineTimeInMicroSec += online_time;
+  ConvOnlineCommSent += online_comm;
+  std::cout << "Current CONV online HE->MPC conversion: runtime = ["
+            << (online_time / 1000000.0) << "] seconds, communication sent = ["
+            << (online_comm / 1024. / 1024.)
+            << "] MB (1 ring element/output, SERVER -> CLIENT)" << std::endl;
 #endif
 
 #if VERIFY_LAYERWISE
@@ -711,6 +818,7 @@ void ConvOnlineCheetah(bool conv_ntt, signedIntType N, signedIntType H, signedIn
 #ifdef LOG_LAYERWISE
   INIT_ALL_IO_DATA_SENT;
   INIT_TIMER;
+  const auto he_online_before = sci::GetHELinearOnlineMetrics();
 #endif
 
   if (zPadWLeft < zPadWRight) {
@@ -771,16 +879,42 @@ void ConvOnlineCheetah(bool conv_ntt, signedIntType N, signedIntType H, signedIn
   }
 
 #ifdef LOG_LAYERWISE
+  // Preprocessing model: the whole HE evaluation is preprocessing, the online
+  // phase is the modelled conversion below. The result-ciphertext transfer
+  // inside the CheetahLinear call is reported separately as a diagnostic.
   auto temp = TIMER_TILL_NOW;
-  ConvTimeInMilliSec += temp;
-  const int64_t nbytes_sent = cheetah_linear->io_counter() - io_counter;
-  std::cout << "Time in sec for current conv = [" << (temp / 1000.0)
-            << "] sent [" << (nbytes_sent / 1024. / 1024.) << "] MB"
-            << std::endl;
-
   uint64_t curComm;
   FIND_ALL_IO_TILL_NOW(curComm);
+  const auto he_ct_return = sci::HELinearOnlineDifference(
+      sci::GetHELinearOnlineMetrics(), he_online_before);
+  ConvTimeInMilliSec += temp;
   ConvCommSent += curComm;
+  std::cout << "Current CONV preprocessing: runtime = [" << (temp / 1000.0)
+            << "] seconds, communication sent = ["
+            << (curComm / 1024. / 1024.) << "] MB (of which result-ciphertext "
+            << "transfer [" << (he_ct_return.sent_bytes / 1024. / 1024.)
+            << "] MB)" << std::endl;
+  RESET_ALL_IO;
+  START_TIMER;
+#endif
+
+  HEToMPCConversionOnline(outArr, static_cast<size_t>(N) * newH * newW * CO);
+
+#ifdef LOG_LAYERWISE
+  const uint64_t online_time =
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::high_resolution_clock::now() - start_timer)
+          .count();
+  uint64_t online_comm;
+  {
+    FIND_ALL_IO_TILL_NOW(online_comm);
+  }
+  ConvOnlineTimeInMicroSec += online_time;
+  ConvOnlineCommSent += online_comm;
+  std::cout << "Current CONV online HE->MPC conversion: runtime = ["
+            << (online_time / 1000000.0) << "] seconds, communication sent = ["
+            << (online_comm / 1024. / 1024.)
+            << "] MB (1 ring element/output, SERVER -> CLIENT)" << std::endl;
 #endif
 
 #if VERIFY_LAYERWISE
@@ -903,6 +1037,7 @@ void BatchNorm(int32_t B, int32_t H, int32_t W, int32_t C,
 #ifdef LOG_LAYERWISE
   INIT_ALL_IO_DATA_SENT;
   INIT_TIMER;
+  const auto he_online_before = sci::GetHELinearOnlineMetrics();
 #endif
   static int batchNormCtr = 1;
 
@@ -950,13 +1085,42 @@ void BatchNorm(int32_t B, int32_t H, int32_t W, int32_t C,
   }
 
 #ifdef LOG_LAYERWISE
+  // Preprocessing model: the whole HE evaluation is preprocessing, the online
+  // phase is the modelled conversion below. The result-ciphertext transfer
+  // inside the CheetahLinear call is reported separately as a diagnostic.
   auto temp = TIMER_TILL_NOW;
-  BatchNormInMilliSec += temp;
   uint64_t curComm;
   FIND_ALL_IO_TILL_NOW(curComm);
+  const auto he_ct_return = sci::HELinearOnlineDifference(
+      sci::GetHELinearOnlineMetrics(), he_online_before);
+  BatchNormInMilliSec += temp;
   BatchNormCommSent += curComm;
-  std::cout << "Time in sec for current BN = [" << (temp / 1000.0) << "] sent ["
-            << (curComm / 1024. / 1024.) << "] MB" << std::endl;
+  std::cout << "Current BN preprocessing: runtime = [" << (temp / 1000.0)
+            << "] seconds, communication sent = ["
+            << (curComm / 1024. / 1024.) << "] MB (of which result-ciphertext "
+            << "transfer [" << (he_ct_return.sent_bytes / 1024. / 1024.)
+            << "] MB)" << std::endl;
+  RESET_ALL_IO;
+  START_TIMER;
+#endif
+
+  HEToMPCConversionOnline(outArr, static_cast<size_t>(B) * H * W * C);
+
+#ifdef LOG_LAYERWISE
+  const uint64_t online_time =
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::high_resolution_clock::now() - start_timer)
+          .count();
+  uint64_t online_comm;
+  {
+    FIND_ALL_IO_TILL_NOW(online_comm);
+  }
+  BatchNormOnlineTimeInMicroSec += online_time;
+  BatchNormOnlineCommSent += online_comm;
+  std::cout << "Current BN online HE->MPC conversion: runtime = ["
+            << (online_time / 1000000.0) << "] seconds, communication sent = ["
+            << (online_comm / 1024. / 1024.)
+            << "] MB (1 ring element/output, SERVER -> CLIENT)" << std::endl;
 #endif
 }
 
@@ -965,6 +1129,7 @@ void ElemWiseActModelVectorMult(int32_t size, intType *inArr,
 #ifdef LOG_LAYERWISE
   INIT_ALL_IO_DATA_SENT;
   INIT_TIMER;
+  const auto he_online_before = sci::GetHELinearOnlineMetrics();
 #endif
 
   static int batchNormCtr = 1;
@@ -998,11 +1163,42 @@ void ElemWiseActModelVectorMult(int32_t size, intType *inArr,
   }
 
 #ifdef LOG_LAYERWISE
+  // Preprocessing model: the whole HE evaluation is preprocessing, the online
+  // phase is the modelled conversion below. The result-ciphertext transfer
+  // inside the CheetahLinear call is reported separately as a diagnostic.
   auto temp = TIMER_TILL_NOW;
-  BatchNormInMilliSec += temp;
   uint64_t curComm;
   FIND_ALL_IO_TILL_NOW(curComm);
+  const auto he_ct_return = sci::HELinearOnlineDifference(
+      sci::GetHELinearOnlineMetrics(), he_online_before);
+  BatchNormInMilliSec += temp;
   BatchNormCommSent += curComm;
+  std::cout << "Current BN-elemwise preprocessing: runtime = [" << (temp / 1000.0)
+            << "] seconds, communication sent = ["
+            << (curComm / 1024. / 1024.) << "] MB (of which result-ciphertext "
+            << "transfer [" << (he_ct_return.sent_bytes / 1024. / 1024.)
+            << "] MB)" << std::endl;
+  RESET_ALL_IO;
+  START_TIMER;
+#endif
+
+  HEToMPCConversionOnline(outputArr, size);
+
+#ifdef LOG_LAYERWISE
+  const uint64_t online_time =
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::high_resolution_clock::now() - start_timer)
+          .count();
+  uint64_t online_comm;
+  {
+    FIND_ALL_IO_TILL_NOW(online_comm);
+  }
+  BatchNormOnlineTimeInMicroSec += online_time;
+  BatchNormOnlineCommSent += online_comm;
+  std::cout << "Current BN-elemwise online HE->MPC conversion: runtime = ["
+            << (online_time / 1000000.0) << "] seconds, communication sent = ["
+            << (online_comm / 1024. / 1024.)
+            << "] MB (1 ring element/output, SERVER -> CLIENT)" << std::endl;
 #endif
 
 #if VERIFY_LAYERWISE
