@@ -90,6 +90,8 @@ uint64_t ConvOnlineRounds = 0;
 uint64_t MatMulOnlineRounds = 0;
 uint64_t BatchNormOnlineRounds = 0;
 uint64_t OTSetupRounds = 0;
+uint64_t SetupCommSent = 0;
+uint64_t SetupRounds = 0;
 uint64_t num_rounds;
 
 #ifdef LOG_LAYERWISE

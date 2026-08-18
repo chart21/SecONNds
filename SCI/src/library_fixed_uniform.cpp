@@ -2305,8 +2305,7 @@ void StartComputation(bool use_heliks, bool use_low_round) {
         std::chrono::duration_cast<std::chrono::microseconds>(
             std::chrono::high_resolution_clock::now() - setup_start)
             .count();
-    for (int i = 0; i < num_threads; i++)
-      OTSetupRounds += ioArr[i]->num_recv_rounds;
+
     std::cout << "OT setup: runtime = [" << (OTSetupTimeInMicroSec / 1000000.0)
               << "] seconds, communication sent = ["
               << (OTSetupCommSent / 1024. / 1024.) << "] MiB" << std::endl;
@@ -2316,6 +2315,11 @@ void StartComputation(bool use_heliks, bool use_low_round) {
     auto temp = ioArr[i]->counter;
     comm_threads[i] = temp;
     rounds_threads[i] = ioArr[i]->num_recv_rounds;
+    // Everything sent before this point is setup: connection, key exchange,
+    // base OT, OT-extension setup and any triple pre-generation. It is not
+    // part of totalComm.
+    SetupCommSent += temp;
+    SetupRounds += rounds_threads[i];
     std::cout << "Thread i = " << i << ", total data sent till now = " << temp
               << std::endl;
   }
@@ -2374,8 +2378,9 @@ void EndComputation() {
   const uint64_t total_preprocessing_time_microseconds =
       OTSetupTimeInMicroSec + offline_encoding_time_microseconds +
       linear_preprocessing_time_microseconds;
+  (void)OTSetupRounds;
   const uint64_t total_preprocessing_sent_bytes =
-      OTSetupCommSent + linear_preprocessing_sent_bytes;
+      SetupCommSent + linear_preprocessing_sent_bytes;
   const uint64_t exec_time_microseconds = 1000ULL * execTimeInMilliSec;
   const uint64_t total_online_time_microseconds =
       exec_time_microseconds > linear_preprocessing_time_microseconds
@@ -2390,7 +2395,7 @@ void EndComputation() {
   const uint64_t linear_preprocessing_rounds =
       ConvRounds + MatMulRounds + BatchNormRounds;
   const uint64_t total_preprocessing_rounds =
-      OTSetupRounds + linear_preprocessing_rounds;
+      SetupRounds + linear_preprocessing_rounds;
   const uint64_t total_online_rounds =
       totalRounds > linear_preprocessing_rounds
           ? totalRounds - linear_preprocessing_rounds
@@ -2403,14 +2408,14 @@ void EndComputation() {
   std::cout << "Total data sent = " << (totalComm / (1.0 * (1ULL << 20)))
             << " MiB." << std::endl;
   std::cout << "Total data sent incl. one-time OT setup = "
-            << ((totalComm + OTSetupCommSent) / (1.0 * (1ULL << 20))) << " MiB."
+            << ((totalComm + SetupCommSent) / (1.0 * (1ULL << 20))) << " MiB."
             << std::endl;
   std::cout << "Number of rounds = " << ioArr[0]->num_rounds - num_rounds
             << std::endl;
   std::cout << "Communication rounds (waits for the peer) = " << totalRounds
             << std::endl;
   std::cout << "  preprocessing rounds = " << total_preprocessing_rounds
-            << " (of which one-time OT setup " << OTSetupRounds << ")"
+            << " (of which setup before the clock " << SetupRounds << ")"
             << std::endl;
   std::cout << "  online rounds        = " << total_online_rounds << std::endl;
   std::cout << "  linear layers: CONV " << ConvRounds << " + FC "

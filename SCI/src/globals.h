@@ -123,6 +123,8 @@ extern uint64_t ConvOnlineRounds;
 extern uint64_t MatMulOnlineRounds;
 extern uint64_t BatchNormOnlineRounds;
 extern uint64_t OTSetupRounds;
+extern uint64_t SetupCommSent;
+extern uint64_t SetupRounds;
 extern uint64_t num_rounds;
 
 #ifdef LOG_LAYERWISE
