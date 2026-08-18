@@ -89,6 +89,7 @@ void MatMul2D(int32_t d0, int32_t d1, int32_t d2, const intType *mat_A,
               const intType *mat_B, intType *mat_C, bool is_A_weight_matrix) {
 #ifdef LOG_LAYERWISE
   INIT_ALL_IO_DATA_SENT;
+  INIT_ALL_ROUNDS;
   INIT_TIMER;
   const auto he_online_before = sci::GetHELinearOnlineMetrics();
 #endif
@@ -156,9 +157,14 @@ void MatMul2D(int32_t d0, int32_t d1, int32_t d2, const intType *mat_A,
   auto temp = TIMER_TILL_NOW;
   uint64_t curComm;
   FIND_ALL_IO_TILL_NOW(curComm);
+  uint64_t preprocessing_rounds;
+  {
+    FIND_ALL_ROUNDS_TILL_NOW(preprocessing_rounds);
+  }
   const auto he_ct_return = sci::HELinearOnlineDifference(
       sci::GetHELinearOnlineMetrics(), he_online_before);
   MatMulTimeInMilliSec += temp;
+  MatMulRounds += preprocessing_rounds;
   MatMulCommSent += curComm;
   std::cout << "Current FC preprocessing: runtime = [" << (temp / 1000.0)
             << "] seconds, communication sent = ["
@@ -166,6 +172,7 @@ void MatMul2D(int32_t d0, int32_t d1, int32_t d2, const intType *mat_A,
             << "transfer [" << (he_ct_return.sent_bytes / 1024. / 1024.)
             << "] MB)" << std::endl;
   RESET_ALL_IO;
+  RESET_ALL_ROUNDS;
   START_TIMER;
 #endif
 
@@ -180,8 +187,13 @@ void MatMul2D(int32_t d0, int32_t d1, int32_t d2, const intType *mat_A,
   {
     FIND_ALL_IO_TILL_NOW(online_comm);
   }
+  uint64_t online_rounds;
+  {
+    FIND_ALL_ROUNDS_TILL_NOW(online_rounds);
+  }
   MatMulOnlineTimeInMicroSec += online_time;
   MatMulOnlineCommSent += online_comm;
+  MatMulOnlineRounds += online_rounds;
   std::cout << "Current FC online HE->MPC conversion: runtime = ["
             << (online_time / 1000000.0) << "] seconds, communication sent = ["
             << (online_comm / 1024. / 1024.)
@@ -270,6 +282,7 @@ void Conv2DWrapper(signedIntType N, signedIntType H, signedIntType W,
                    intType *outArr) {
 #ifdef LOG_LAYERWISE
   INIT_ALL_IO_DATA_SENT;
+  INIT_ALL_ROUNDS;
   INIT_TIMER;
   const auto he_online_before = sci::GetHELinearOnlineMetrics();
 #endif
@@ -354,9 +367,14 @@ void Conv2DWrapper(signedIntType N, signedIntType H, signedIntType W,
   auto temp = TIMER_TILL_NOW;
   uint64_t curComm;
   FIND_ALL_IO_TILL_NOW(curComm);
+  uint64_t preprocessing_rounds;
+  {
+    FIND_ALL_ROUNDS_TILL_NOW(preprocessing_rounds);
+  }
   const auto he_ct_return = sci::HELinearOnlineDifference(
       sci::GetHELinearOnlineMetrics(), he_online_before);
   ConvTimeInMilliSec += temp;
+  ConvRounds += preprocessing_rounds;
   ConvCommSent += curComm;
   std::cout << "Current CONV preprocessing: runtime = [" << (temp / 1000.0)
             << "] seconds, communication sent = ["
@@ -364,6 +382,7 @@ void Conv2DWrapper(signedIntType N, signedIntType H, signedIntType W,
             << "transfer [" << (he_ct_return.sent_bytes / 1024. / 1024.)
             << "] MB)" << std::endl;
   RESET_ALL_IO;
+  RESET_ALL_ROUNDS;
   START_TIMER;
 #endif
 
@@ -378,8 +397,13 @@ void Conv2DWrapper(signedIntType N, signedIntType H, signedIntType W,
   {
     FIND_ALL_IO_TILL_NOW(online_comm);
   }
+  uint64_t online_rounds;
+  {
+    FIND_ALL_ROUNDS_TILL_NOW(online_rounds);
+  }
   ConvOnlineTimeInMicroSec += online_time;
   ConvOnlineCommSent += online_comm;
+  ConvOnlineRounds += online_rounds;
   std::cout << "Current CONV online HE->MPC conversion: runtime = ["
             << (online_time / 1000000.0) << "] seconds, communication sent = ["
             << (online_comm / 1024. / 1024.)
@@ -509,6 +533,7 @@ void Conv2DWrapper(bool conv_ntt, signedIntType N, signedIntType H, signedIntTyp
                    intType *outArr) {
 #ifdef LOG_LAYERWISE
   INIT_ALL_IO_DATA_SENT;
+  INIT_ALL_ROUNDS;
   INIT_TIMER;
   const auto he_online_before = sci::GetHELinearOnlineMetrics();
 #endif
@@ -593,9 +618,14 @@ void Conv2DWrapper(bool conv_ntt, signedIntType N, signedIntType H, signedIntTyp
   auto temp = TIMER_TILL_NOW;
   uint64_t curComm;
   FIND_ALL_IO_TILL_NOW(curComm);
+  uint64_t preprocessing_rounds;
+  {
+    FIND_ALL_ROUNDS_TILL_NOW(preprocessing_rounds);
+  }
   const auto he_ct_return = sci::HELinearOnlineDifference(
       sci::GetHELinearOnlineMetrics(), he_online_before);
   ConvTimeInMilliSec += temp;
+  ConvRounds += preprocessing_rounds;
   ConvCommSent += curComm;
   std::cout << "Current CONV preprocessing: runtime = [" << (temp / 1000.0)
             << "] seconds, communication sent = ["
@@ -603,6 +633,7 @@ void Conv2DWrapper(bool conv_ntt, signedIntType N, signedIntType H, signedIntTyp
             << "transfer [" << (he_ct_return.sent_bytes / 1024. / 1024.)
             << "] MB)" << std::endl;
   RESET_ALL_IO;
+  RESET_ALL_ROUNDS;
   START_TIMER;
 #endif
 
@@ -617,8 +648,13 @@ void Conv2DWrapper(bool conv_ntt, signedIntType N, signedIntType H, signedIntTyp
   {
     FIND_ALL_IO_TILL_NOW(online_comm);
   }
+  uint64_t online_rounds;
+  {
+    FIND_ALL_ROUNDS_TILL_NOW(online_rounds);
+  }
   ConvOnlineTimeInMicroSec += online_time;
   ConvOnlineCommSent += online_comm;
+  ConvOnlineRounds += online_rounds;
   std::cout << "Current CONV online HE->MPC conversion: runtime = ["
             << (online_time / 1000000.0) << "] seconds, communication sent = ["
             << (online_comm / 1024. / 1024.)
@@ -817,6 +853,7 @@ void ConvOnlineCheetah(bool conv_ntt, signedIntType N, signedIntType H, signedIn
                     intType *outArr) {
 #ifdef LOG_LAYERWISE
   INIT_ALL_IO_DATA_SENT;
+  INIT_ALL_ROUNDS;
   INIT_TIMER;
   const auto he_online_before = sci::GetHELinearOnlineMetrics();
 #endif
@@ -885,9 +922,14 @@ void ConvOnlineCheetah(bool conv_ntt, signedIntType N, signedIntType H, signedIn
   auto temp = TIMER_TILL_NOW;
   uint64_t curComm;
   FIND_ALL_IO_TILL_NOW(curComm);
+  uint64_t preprocessing_rounds;
+  {
+    FIND_ALL_ROUNDS_TILL_NOW(preprocessing_rounds);
+  }
   const auto he_ct_return = sci::HELinearOnlineDifference(
       sci::GetHELinearOnlineMetrics(), he_online_before);
   ConvTimeInMilliSec += temp;
+  ConvRounds += preprocessing_rounds;
   ConvCommSent += curComm;
   std::cout << "Current CONV preprocessing: runtime = [" << (temp / 1000.0)
             << "] seconds, communication sent = ["
@@ -895,6 +937,7 @@ void ConvOnlineCheetah(bool conv_ntt, signedIntType N, signedIntType H, signedIn
             << "transfer [" << (he_ct_return.sent_bytes / 1024. / 1024.)
             << "] MB)" << std::endl;
   RESET_ALL_IO;
+  RESET_ALL_ROUNDS;
   START_TIMER;
 #endif
 
@@ -909,8 +952,13 @@ void ConvOnlineCheetah(bool conv_ntt, signedIntType N, signedIntType H, signedIn
   {
     FIND_ALL_IO_TILL_NOW(online_comm);
   }
+  uint64_t online_rounds;
+  {
+    FIND_ALL_ROUNDS_TILL_NOW(online_rounds);
+  }
   ConvOnlineTimeInMicroSec += online_time;
   ConvOnlineCommSent += online_comm;
+  ConvOnlineRounds += online_rounds;
   std::cout << "Current CONV online HE->MPC conversion: runtime = ["
             << (online_time / 1000000.0) << "] seconds, communication sent = ["
             << (online_comm / 1024. / 1024.)
@@ -1036,6 +1084,7 @@ void BatchNorm(int32_t B, int32_t H, int32_t W, int32_t C,
                const intType *bias, intType *outArr) {
 #ifdef LOG_LAYERWISE
   INIT_ALL_IO_DATA_SENT;
+  INIT_ALL_ROUNDS;
   INIT_TIMER;
   const auto he_online_before = sci::GetHELinearOnlineMetrics();
 #endif
@@ -1091,9 +1140,14 @@ void BatchNorm(int32_t B, int32_t H, int32_t W, int32_t C,
   auto temp = TIMER_TILL_NOW;
   uint64_t curComm;
   FIND_ALL_IO_TILL_NOW(curComm);
+  uint64_t preprocessing_rounds;
+  {
+    FIND_ALL_ROUNDS_TILL_NOW(preprocessing_rounds);
+  }
   const auto he_ct_return = sci::HELinearOnlineDifference(
       sci::GetHELinearOnlineMetrics(), he_online_before);
   BatchNormInMilliSec += temp;
+  BatchNormRounds += preprocessing_rounds;
   BatchNormCommSent += curComm;
   std::cout << "Current BN preprocessing: runtime = [" << (temp / 1000.0)
             << "] seconds, communication sent = ["
@@ -1101,6 +1155,7 @@ void BatchNorm(int32_t B, int32_t H, int32_t W, int32_t C,
             << "transfer [" << (he_ct_return.sent_bytes / 1024. / 1024.)
             << "] MB)" << std::endl;
   RESET_ALL_IO;
+  RESET_ALL_ROUNDS;
   START_TIMER;
 #endif
 
@@ -1115,8 +1170,13 @@ void BatchNorm(int32_t B, int32_t H, int32_t W, int32_t C,
   {
     FIND_ALL_IO_TILL_NOW(online_comm);
   }
+  uint64_t online_rounds;
+  {
+    FIND_ALL_ROUNDS_TILL_NOW(online_rounds);
+  }
   BatchNormOnlineTimeInMicroSec += online_time;
   BatchNormOnlineCommSent += online_comm;
+  BatchNormOnlineRounds += online_rounds;
   std::cout << "Current BN online HE->MPC conversion: runtime = ["
             << (online_time / 1000000.0) << "] seconds, communication sent = ["
             << (online_comm / 1024. / 1024.)
@@ -1128,6 +1188,7 @@ void ElemWiseActModelVectorMult(int32_t size, intType *inArr,
                                 intType *multArrVec, intType *outputArr) {
 #ifdef LOG_LAYERWISE
   INIT_ALL_IO_DATA_SENT;
+  INIT_ALL_ROUNDS;
   INIT_TIMER;
   const auto he_online_before = sci::GetHELinearOnlineMetrics();
 #endif
@@ -1169,9 +1230,14 @@ void ElemWiseActModelVectorMult(int32_t size, intType *inArr,
   auto temp = TIMER_TILL_NOW;
   uint64_t curComm;
   FIND_ALL_IO_TILL_NOW(curComm);
+  uint64_t preprocessing_rounds;
+  {
+    FIND_ALL_ROUNDS_TILL_NOW(preprocessing_rounds);
+  }
   const auto he_ct_return = sci::HELinearOnlineDifference(
       sci::GetHELinearOnlineMetrics(), he_online_before);
   BatchNormInMilliSec += temp;
+  BatchNormRounds += preprocessing_rounds;
   BatchNormCommSent += curComm;
   std::cout << "Current BN-elemwise preprocessing: runtime = [" << (temp / 1000.0)
             << "] seconds, communication sent = ["
@@ -1179,6 +1245,7 @@ void ElemWiseActModelVectorMult(int32_t size, intType *inArr,
             << "transfer [" << (he_ct_return.sent_bytes / 1024. / 1024.)
             << "] MB)" << std::endl;
   RESET_ALL_IO;
+  RESET_ALL_ROUNDS;
   START_TIMER;
 #endif
 
@@ -1193,8 +1260,13 @@ void ElemWiseActModelVectorMult(int32_t size, intType *inArr,
   {
     FIND_ALL_IO_TILL_NOW(online_comm);
   }
+  uint64_t online_rounds;
+  {
+    FIND_ALL_ROUNDS_TILL_NOW(online_rounds);
+  }
   BatchNormOnlineTimeInMicroSec += online_time;
   BatchNormOnlineCommSent += online_comm;
+  BatchNormOnlineRounds += online_rounds;
   std::cout << "Current BN-elemwise online HE->MPC conversion: runtime = ["
             << (online_time / 1000000.0) << "] seconds, communication sent = ["
             << (online_comm / 1024. / 1024.)

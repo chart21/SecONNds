@@ -115,6 +115,14 @@ extern sci::PRG128 *prgInstanceArr[MAX_THREADS];
 
 extern std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
 extern uint64_t comm_threads[MAX_THREADS];
+extern uint64_t rounds_threads[MAX_THREADS];
+extern uint64_t ConvRounds;
+extern uint64_t MatMulRounds;
+extern uint64_t BatchNormRounds;
+extern uint64_t ConvOnlineRounds;
+extern uint64_t MatMulOnlineRounds;
+extern uint64_t BatchNormOnlineRounds;
+extern uint64_t OTSetupRounds;
 extern uint64_t num_rounds;
 
 #ifdef LOG_LAYERWISE

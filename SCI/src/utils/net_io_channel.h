@@ -59,6 +59,9 @@ public:
   string addr;
   int port;
   uint64_t num_rounds = 0;
+  // Times this party blocked waiting for the peer: one per switch into a
+  // receive phase. This is the communication-round count in the usual sense.
+  uint64_t num_recv_rounds = 0;
   LastCall last_call = LastCall::None;
   NetIO(const char *address, int port, bool quiet = false) {
     this->port = port;
@@ -167,6 +170,7 @@ public:
   void recv_data_internal(void *data, int len) {
     if (last_call != LastCall::Recv) {
       num_rounds++;
+      num_recv_rounds++;
       last_call = LastCall::Recv;
     }
     if (has_sent)

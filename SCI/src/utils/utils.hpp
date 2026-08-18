@@ -264,6 +264,19 @@ inline uint64_t all1Mask(int x){
         for(int __thrdCtr = 0; __thrdCtr < ::num_threads; __thrdCtr++){\
             __ioStartTracker[__thrdCtr] = ::ioArr[__thrdCtr]->counter;\
         }
+
+#define INIT_ALL_ROUNDS uint64_t __roundStartTracker[::num_threads];\
+        for(int __thrdCtr = 0; __thrdCtr < ::num_threads; __thrdCtr++){\
+            __roundStartTracker[__thrdCtr] = ::ioArr[__thrdCtr]->num_recv_rounds;\
+        }
+#define FIND_ALL_ROUNDS_TILL_NOW(var) uint64_t __curRounds = 0;\
+        for(int __thrdCtr = 0; __thrdCtr < ::num_threads; __thrdCtr++){\
+             __curRounds += ((::ioArr[__thrdCtr]->num_recv_rounds) - __roundStartTracker[__thrdCtr]);\
+        }\
+        var = __curRounds;
+#define RESET_ALL_ROUNDS for(int __thrdCtr = 0; __thrdCtr < ::num_threads; __thrdCtr++){\
+            __roundStartTracker[__thrdCtr] = ::ioArr[__thrdCtr]->num_recv_rounds;\
+        }
 #define FIND_ALL_IO_TILL_NOW(var) uint64_t __curComm = 0;\
         for(int __thrdCtr = 0; __thrdCtr < ::num_threads; __thrdCtr++){\
              __curComm += ((::ioArr[__thrdCtr]->counter) - __ioStartTracker[__thrdCtr]);\
