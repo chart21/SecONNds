@@ -2342,6 +2342,7 @@ void EndComputation() {
           .count();
   uint64_t totalComm = 0;
   uint64_t totalRounds = 0;
+  uint64_t maxThreadRounds = 0;
   std::cout << "EndCompuation() called ...\n";
   for (int i = 0; i < num_threads; i++) {
     auto temp = ioArr[i]->counter;
@@ -2355,7 +2356,9 @@ void EndComputation() {
               << ", 3Gen Buffer pointer = " << tripleGenArr[i]->getBufferPointer()
               << std::endl;
     totalComm += (temp - comm_threads[i]);
-    totalRounds += (ioArr[i]->num_recv_rounds - rounds_threads[i]);
+    const uint64_t thread_rounds = ioArr[i]->num_recv_rounds - rounds_threads[i];
+    totalRounds += thread_rounds;
+    if (thread_rounds > maxThreadRounds) maxThreadRounds = thread_rounds;
   }
   uint64_t totalCommClient = 0;
   uint64_t totalPreprocessingSentClient = 0;
@@ -2413,6 +2416,10 @@ void EndComputation() {
   std::cout << "Number of rounds = " << ioArr[0]->num_rounds - num_rounds
             << std::endl;
   std::cout << "Communication rounds (waits for the peer) = " << totalRounds
+            << " summed over " << num_threads << " threads" << std::endl;
+  // Threads run concurrently, so the latency-relevant figure is the busiest
+  // thread, not the sum: that is what sits on the critical path.
+  std::cout << "  critical-path rounds (max over threads) = " << maxThreadRounds
             << std::endl;
   std::cout << "  preprocessing rounds = " << total_preprocessing_rounds
             << " (of which setup before the clock " << SetupRounds << ")"
