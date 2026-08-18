@@ -2469,6 +2469,14 @@ void EndComputation() {
     std::cout << ", communication (sent+received) = (see SERVER OUTPUT)";
   }
   std::cout << std::endl;
+  // "Total time taken" covers only the execution window: the clock starts
+  // after the setup handshake (and, in SecONNds, after the filters have been
+  // encoded). Preprocessing includes that pre-clock work, so the phases sum to
+  // the execution time plus it -- printed here so the identity is visible.
+  std::cout << "Total time incl. pre-clock preprocessing = "
+            << ((total_preprocessing_time_microseconds +
+                 total_online_time_microseconds) / 1000000.0)
+            << " seconds." << std::endl;
   std::cout << "Total online: runtime = ["
             << (total_online_time_microseconds / 1000000.0)
             << "] seconds, communication sent = ["
