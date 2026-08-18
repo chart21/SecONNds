@@ -118,6 +118,7 @@ extern uint64_t comm_threads[MAX_THREADS];
 extern uint64_t rounds_threads[MAX_THREADS];
 extern uint64_t seq_rounds_threads[MAX_THREADS];
 extern uint64_t SequentialRounds;
+extern std::chrono::high_resolution_clock::time_point program_start_time;
 extern uint64_t ConvRounds;
 extern uint64_t MatMulRounds;
 extern uint64_t BatchNormRounds;

@@ -2047,6 +2047,9 @@ void TripleGen(bool enableBuffer, int64_t buffSize, int64_t chunkSize){
 }
 
 void ConnectAndSetUp(bool use_heliks){
+  // Stamp the true start: connection, key exchange, base OT, OT-extension
+  // setup and the filter/NTT encoding all belong in the total we report.
+  program_start_time = std::chrono::high_resolution_clock::now();
   assert(bitlength < 64 && bitlength > 0);
   assert(num_threads <= MAX_THREADS);
 
@@ -2407,7 +2410,13 @@ void EndComputation() {
   std::cout << "------------------------------------------------------\n";
   std::cout << "------------------------------------------------------\n";
   std::cout << "------------------------------------------------------\n";
-  std::cout << "Total time taken = " << execTimeInMilliSec
+  const auto totalTimeInclSetup =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::high_resolution_clock::now() - program_start_time)
+          .count();
+  std::cout << "Total time taken = " << totalTimeInclSetup
+            << " milliseconds (incl. setup).\n";
+  std::cout << "  execution window only (excl. setup) = " << execTimeInMilliSec
             << " milliseconds.\n";
   std::cout << "Total data sent = " << (totalComm / (1.0 * (1ULL << 20)))
             << " MiB." << std::endl;
