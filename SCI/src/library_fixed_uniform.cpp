@@ -2309,7 +2309,8 @@ void StartComputation(bool use_heliks, bool use_low_round) {
             std::chrono::high_resolution_clock::now() - setup_start)
             .count();
 
-    std::cout << "Triple generation (preprocessing material): runtime = ["
+    std::cout << "Triple generation (" << TripleGenCalls
+            << " calls, buffer fill + on-the-fly): runtime = ["
             << (TripleGenTimeInMicroSec / 1000000.0)
             << "] seconds, communication sent = ["
             << (TripleGenCommSent / 1024. / 1024.) << "] MiB" << std::endl;

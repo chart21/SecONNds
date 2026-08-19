@@ -29,6 +29,7 @@ SOFTWARE.
 // drags SEAL headers into translation units that do not have them
 extern uint64_t TripleGenTimeInMicroSec;
 extern uint64_t TripleGenCommSent;
+extern uint64_t TripleGenCalls;
 
 #define TGEN_PRINT_TIME 1
 #define TGEN_PRINT_COMP 0
@@ -212,11 +213,6 @@ template <typename IO> class TripleGenerator {
 //     TripleGenMethod method = _16KKOT_to_4OT
 // #endif
       ) {
-      // Refilling the bit-triple buffer is input-independent correlated
-      // randomness: preprocessing material. It runs outside every layer timer,
-      // so account for it explicitly here.
-      const auto __tg_start = std::chrono::high_resolution_clock::now();
-      const uint64_t __tg_comm0 = io->counter;
       _Bai = new uint8_t[_buffBytes];
       _Bbi = new uint8_t[_buffBytes];
       _Bci = new uint8_t[_buffBytes];
@@ -236,11 +232,7 @@ template <typename IO> class TripleGenerator {
       _buffPtr = 0;
       _buffEnable  = true;
       _nRefill++;
-      TripleGenTimeInMicroSec +=
-          std::chrono::duration_cast<std::chrono::microseconds>(
-              std::chrono::high_resolution_clock::now() - __tg_start)
-              .count();
-      TripleGenCommSent += (io->counter - __tg_comm0);
+
     }
 
     /* get triples from the buffer
@@ -367,11 +359,34 @@ template <typename IO> class TripleGenerator {
     double mill_time = 0; // Time taken for millioinaires' protocol
     double mill_comm = 0; // Communication in millionaires' protocol
 
+    // Every bit triple is produced here, whether it comes from the initial
+    // buffer fill (setup) or is generated on the fly when the buffer runs dry
+    // during the online phase. Instrumenting this one place catches both; the
+    // caller can tell them apart by when they happen.
+    struct TripleGenScope {
+      std::chrono::high_resolution_clock::time_point t0;
+      uint64_t c0;
+      IO *io_;
+      explicit TripleGenScope(IO *io)
+          : t0(std::chrono::high_resolution_clock::now()),
+            c0(io->counter),
+            io_(io) {}
+      ~TripleGenScope() {
+        TripleGenTimeInMicroSec +=
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::high_resolution_clock::now() - t0)
+                .count();
+        TripleGenCommSent += (io_->counter - c0);
+        TripleGenCalls++;
+      }
+    };
+
     void generate(int party, uint8_t *ai, uint8_t *bi, uint8_t *ci,
                   uint64_t num_triples, TripleGenMethod method, bool packed = false,
                   int offset = 1) {
       if (!num_triples)
         return;
+      TripleGenScope __tg(io);
       switch (method) {
         case Ideal: {
           int num_bytes = ceil((double)num_triples / 8);
