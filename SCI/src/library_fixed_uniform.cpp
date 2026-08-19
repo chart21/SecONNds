@@ -2310,7 +2310,10 @@ void StartComputation(bool use_heliks, bool use_low_round) {
             .count();
 
     std::cout << "Triple generation (" << TripleGenCalls
-            << " calls, buffer fill + on-the-fly): runtime = ["
+            << " calls, buffer fill + on-the-fly; summed over " << num_threads
+            << " threads, i.e. ~"
+            << (TripleGenTimeInMicroSec / 1000000.0 / (num_threads ? num_threads : 1))
+            << " s wall): runtime = ["
             << (TripleGenTimeInMicroSec / 1000000.0)
             << "] seconds, communication sent = ["
             << (TripleGenCommSent / 1024. / 1024.) << "] MiB" << std::endl;
@@ -2392,8 +2395,12 @@ void EndComputation() {
   // The filter/NTT encoding runs before StartComputation() starts the clock, so
   // it counts as preprocessing but is not part of execTimeInMilliSec and must
   // not be subtracted from it when deriving the online time.
+  // NB: TripleGenTimeInMicroSec is summed over threads, and the initial buffer
+  // fill already sits inside the measured setup window while the on-the-fly
+  // top-ups sit inside the execution window. Adding it here would double-count
+  // it (and by a factor of num_threads); it is reported as a diagnostic only.
   const uint64_t offline_encoding_time_microseconds =
-      1000ULL * ConvOffTimeInMilliSec + TripleGenTimeInMicroSec;
+      1000ULL * ConvOffTimeInMilliSec;
   const uint64_t linear_preprocessing_sent_bytes =
       preprocessing_model ? (ConvCommSent + MatMulCommSent + BatchNormCommSent)
                           : 0;
