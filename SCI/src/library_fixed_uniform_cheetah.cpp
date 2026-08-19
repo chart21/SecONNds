@@ -97,6 +97,7 @@ void MatMul2D(int32_t d0, int32_t d1, int32_t d2, const intType *mat_A,
 #ifdef LOG_LAYERWISE
   INIT_ALL_IO_DATA_SENT;
   INIT_ALL_ROUNDS;
+  ACCUMULATE_SEQ_ROUNDS_TO(SeqRoundsOnline);  // work since the last layer
   INIT_TIMER;
   const auto he_online_before = sci::GetHELinearOnlineMetrics();
 #endif
@@ -168,7 +169,7 @@ void MatMul2D(int32_t d0, int32_t d1, int32_t d2, const intType *mat_A,
   {
     FIND_ALL_ROUNDS_TILL_NOW(preprocessing_rounds);
   }
-  ACCUMULATE_SEQ_ROUNDS;
+  ACCUMULATE_SEQ_ROUNDS_TO(SeqRoundsPre);
   const auto he_ct_return = sci::HELinearOnlineDifference(
       sci::GetHELinearOnlineMetrics(), he_online_before);
   MatMulTimeInMilliSec += temp;
@@ -199,7 +200,7 @@ void MatMul2D(int32_t d0, int32_t d1, int32_t d2, const intType *mat_A,
   {
     FIND_ALL_ROUNDS_TILL_NOW(online_rounds);
   }
-  ACCUMULATE_SEQ_ROUNDS;
+  ACCUMULATE_SEQ_ROUNDS_TO(SeqRoundsOnline);
   MatMulOnlineTimeInMicroSec += online_time;
   MatMulOnlineCommSent += online_comm;
   MatMulOnlineRounds += online_rounds;
@@ -292,6 +293,7 @@ void Conv2DWrapper(signedIntType N, signedIntType H, signedIntType W,
 #ifdef LOG_LAYERWISE
   INIT_ALL_IO_DATA_SENT;
   INIT_ALL_ROUNDS;
+  ACCUMULATE_SEQ_ROUNDS_TO(SeqRoundsOnline);  // work since the last layer
   INIT_TIMER;
   const auto he_online_before = sci::GetHELinearOnlineMetrics();
 #endif
@@ -380,7 +382,7 @@ void Conv2DWrapper(signedIntType N, signedIntType H, signedIntType W,
   {
     FIND_ALL_ROUNDS_TILL_NOW(preprocessing_rounds);
   }
-  ACCUMULATE_SEQ_ROUNDS;
+  ACCUMULATE_SEQ_ROUNDS_TO(SeqRoundsPre);
   const auto he_ct_return = sci::HELinearOnlineDifference(
       sci::GetHELinearOnlineMetrics(), he_online_before);
   ConvTimeInMilliSec += temp;
@@ -411,7 +413,7 @@ void Conv2DWrapper(signedIntType N, signedIntType H, signedIntType W,
   {
     FIND_ALL_ROUNDS_TILL_NOW(online_rounds);
   }
-  ACCUMULATE_SEQ_ROUNDS;
+  ACCUMULATE_SEQ_ROUNDS_TO(SeqRoundsOnline);
   ConvOnlineTimeInMicroSec += online_time;
   ConvOnlineCommSent += online_comm;
   ConvOnlineRounds += online_rounds;
@@ -545,6 +547,7 @@ void Conv2DWrapper(bool conv_ntt, signedIntType N, signedIntType H, signedIntTyp
 #ifdef LOG_LAYERWISE
   INIT_ALL_IO_DATA_SENT;
   INIT_ALL_ROUNDS;
+  ACCUMULATE_SEQ_ROUNDS_TO(SeqRoundsOnline);  // work since the last layer
   INIT_TIMER;
   const auto he_online_before = sci::GetHELinearOnlineMetrics();
 #endif
@@ -633,7 +636,7 @@ void Conv2DWrapper(bool conv_ntt, signedIntType N, signedIntType H, signedIntTyp
   {
     FIND_ALL_ROUNDS_TILL_NOW(preprocessing_rounds);
   }
-  ACCUMULATE_SEQ_ROUNDS;
+  ACCUMULATE_SEQ_ROUNDS_TO(SeqRoundsPre);
   const auto he_ct_return = sci::HELinearOnlineDifference(
       sci::GetHELinearOnlineMetrics(), he_online_before);
   ConvTimeInMilliSec += temp;
@@ -664,7 +667,7 @@ void Conv2DWrapper(bool conv_ntt, signedIntType N, signedIntType H, signedIntTyp
   {
     FIND_ALL_ROUNDS_TILL_NOW(online_rounds);
   }
-  ACCUMULATE_SEQ_ROUNDS;
+  ACCUMULATE_SEQ_ROUNDS_TO(SeqRoundsOnline);
   ConvOnlineTimeInMicroSec += online_time;
   ConvOnlineCommSent += online_comm;
   ConvOnlineRounds += online_rounds;
@@ -867,6 +870,7 @@ void ConvOnlineCheetah(bool conv_ntt, signedIntType N, signedIntType H, signedIn
 #ifdef LOG_LAYERWISE
   INIT_ALL_IO_DATA_SENT;
   INIT_ALL_ROUNDS;
+  ACCUMULATE_SEQ_ROUNDS_TO(SeqRoundsOnline);  // work since the last layer
   INIT_TIMER;
   const auto he_online_before = sci::GetHELinearOnlineMetrics();
 #endif
@@ -939,7 +943,7 @@ void ConvOnlineCheetah(bool conv_ntt, signedIntType N, signedIntType H, signedIn
   {
     FIND_ALL_ROUNDS_TILL_NOW(preprocessing_rounds);
   }
-  ACCUMULATE_SEQ_ROUNDS;
+  ACCUMULATE_SEQ_ROUNDS_TO(SeqRoundsPre);
   const auto he_ct_return = sci::HELinearOnlineDifference(
       sci::GetHELinearOnlineMetrics(), he_online_before);
   ConvTimeInMilliSec += temp;
@@ -970,7 +974,7 @@ void ConvOnlineCheetah(bool conv_ntt, signedIntType N, signedIntType H, signedIn
   {
     FIND_ALL_ROUNDS_TILL_NOW(online_rounds);
   }
-  ACCUMULATE_SEQ_ROUNDS;
+  ACCUMULATE_SEQ_ROUNDS_TO(SeqRoundsOnline);
   ConvOnlineTimeInMicroSec += online_time;
   ConvOnlineCommSent += online_comm;
   ConvOnlineRounds += online_rounds;
@@ -1100,6 +1104,7 @@ void BatchNorm(int32_t B, int32_t H, int32_t W, int32_t C,
 #ifdef LOG_LAYERWISE
   INIT_ALL_IO_DATA_SENT;
   INIT_ALL_ROUNDS;
+  ACCUMULATE_SEQ_ROUNDS_TO(SeqRoundsOnline);  // work since the last layer
   INIT_TIMER;
   const auto he_online_before = sci::GetHELinearOnlineMetrics();
 #endif
@@ -1159,7 +1164,7 @@ void BatchNorm(int32_t B, int32_t H, int32_t W, int32_t C,
   {
     FIND_ALL_ROUNDS_TILL_NOW(preprocessing_rounds);
   }
-  ACCUMULATE_SEQ_ROUNDS;
+  ACCUMULATE_SEQ_ROUNDS_TO(SeqRoundsPre);
   const auto he_ct_return = sci::HELinearOnlineDifference(
       sci::GetHELinearOnlineMetrics(), he_online_before);
   BatchNormInMilliSec += temp;
@@ -1190,7 +1195,7 @@ void BatchNorm(int32_t B, int32_t H, int32_t W, int32_t C,
   {
     FIND_ALL_ROUNDS_TILL_NOW(online_rounds);
   }
-  ACCUMULATE_SEQ_ROUNDS;
+  ACCUMULATE_SEQ_ROUNDS_TO(SeqRoundsOnline);
   BatchNormOnlineTimeInMicroSec += online_time;
   BatchNormOnlineCommSent += online_comm;
   BatchNormOnlineRounds += online_rounds;
@@ -1206,6 +1211,7 @@ void ElemWiseActModelVectorMult(int32_t size, intType *inArr,
 #ifdef LOG_LAYERWISE
   INIT_ALL_IO_DATA_SENT;
   INIT_ALL_ROUNDS;
+  ACCUMULATE_SEQ_ROUNDS_TO(SeqRoundsOnline);  // work since the last layer
   INIT_TIMER;
   const auto he_online_before = sci::GetHELinearOnlineMetrics();
 #endif
@@ -1251,7 +1257,7 @@ void ElemWiseActModelVectorMult(int32_t size, intType *inArr,
   {
     FIND_ALL_ROUNDS_TILL_NOW(preprocessing_rounds);
   }
-  ACCUMULATE_SEQ_ROUNDS;
+  ACCUMULATE_SEQ_ROUNDS_TO(SeqRoundsPre);
   const auto he_ct_return = sci::HELinearOnlineDifference(
       sci::GetHELinearOnlineMetrics(), he_online_before);
   BatchNormInMilliSec += temp;
@@ -1282,7 +1288,7 @@ void ElemWiseActModelVectorMult(int32_t size, intType *inArr,
   {
     FIND_ALL_ROUNDS_TILL_NOW(online_rounds);
   }
-  ACCUMULATE_SEQ_ROUNDS;
+  ACCUMULATE_SEQ_ROUNDS_TO(SeqRoundsOnline);
   BatchNormOnlineTimeInMicroSec += online_time;
   BatchNormOnlineCommSent += online_comm;
   BatchNormOnlineRounds += online_rounds;
