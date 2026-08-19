@@ -29,6 +29,7 @@ SOFTWARE.
 #include "defines.h"
 #include "defines_uniform.h"
 #include <chrono>
+#include <cstdlib>
 #include <cstdint>
 #include <thread>
 #include "OT/kkot.h"
@@ -121,6 +122,13 @@ extern uint64_t SequentialRounds;
 extern uint64_t SeqRoundsPre;
 extern uint64_t SeqRoundsOnline;
 extern uint64_t SeqSetupRounds;
+
+// Without the preprocessing change the HE linear layers are online work, so
+// their rounds belong to the online bucket.
+inline uint64_t &LinearPhaseRoundBucket() {
+  static const bool model = std::getenv("SKIP_HE2MPC_CONVERSION") == nullptr;
+  return model ? SeqRoundsPre : SeqRoundsOnline;
+}
 extern uint64_t TripleGenTimeInMicroSec;
 extern uint64_t TripleGenCommSent;
 extern uint64_t TripleGenCalls;

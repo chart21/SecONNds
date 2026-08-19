@@ -169,7 +169,7 @@ void MatMul2D(int32_t d0, int32_t d1, int32_t d2, const intType *mat_A,
   {
     FIND_ALL_ROUNDS_TILL_NOW(preprocessing_rounds);
   }
-  ACCUMULATE_SEQ_ROUNDS_TO(SeqRoundsPre);
+  ACCUMULATE_SEQ_ROUNDS_INTO(LinearPhaseRoundBucket());
   const auto he_ct_return = sci::HELinearOnlineDifference(
       sci::GetHELinearOnlineMetrics(), he_online_before);
   MatMulTimeInMilliSec += temp;
@@ -382,7 +382,7 @@ void Conv2DWrapper(signedIntType N, signedIntType H, signedIntType W,
   {
     FIND_ALL_ROUNDS_TILL_NOW(preprocessing_rounds);
   }
-  ACCUMULATE_SEQ_ROUNDS_TO(SeqRoundsPre);
+  ACCUMULATE_SEQ_ROUNDS_INTO(LinearPhaseRoundBucket());
   const auto he_ct_return = sci::HELinearOnlineDifference(
       sci::GetHELinearOnlineMetrics(), he_online_before);
   ConvTimeInMilliSec += temp;
@@ -636,7 +636,7 @@ void Conv2DWrapper(bool conv_ntt, signedIntType N, signedIntType H, signedIntTyp
   {
     FIND_ALL_ROUNDS_TILL_NOW(preprocessing_rounds);
   }
-  ACCUMULATE_SEQ_ROUNDS_TO(SeqRoundsPre);
+  ACCUMULATE_SEQ_ROUNDS_INTO(LinearPhaseRoundBucket());
   const auto he_ct_return = sci::HELinearOnlineDifference(
       sci::GetHELinearOnlineMetrics(), he_online_before);
   ConvTimeInMilliSec += temp;
@@ -943,7 +943,7 @@ void ConvOnlineCheetah(bool conv_ntt, signedIntType N, signedIntType H, signedIn
   {
     FIND_ALL_ROUNDS_TILL_NOW(preprocessing_rounds);
   }
-  ACCUMULATE_SEQ_ROUNDS_TO(SeqRoundsPre);
+  ACCUMULATE_SEQ_ROUNDS_INTO(LinearPhaseRoundBucket());
   const auto he_ct_return = sci::HELinearOnlineDifference(
       sci::GetHELinearOnlineMetrics(), he_online_before);
   ConvTimeInMilliSec += temp;
@@ -1164,7 +1164,7 @@ void BatchNorm(int32_t B, int32_t H, int32_t W, int32_t C,
   {
     FIND_ALL_ROUNDS_TILL_NOW(preprocessing_rounds);
   }
-  ACCUMULATE_SEQ_ROUNDS_TO(SeqRoundsPre);
+  ACCUMULATE_SEQ_ROUNDS_INTO(LinearPhaseRoundBucket());
   const auto he_ct_return = sci::HELinearOnlineDifference(
       sci::GetHELinearOnlineMetrics(), he_online_before);
   BatchNormInMilliSec += temp;
@@ -1257,7 +1257,7 @@ void ElemWiseActModelVectorMult(int32_t size, intType *inArr,
   {
     FIND_ALL_ROUNDS_TILL_NOW(preprocessing_rounds);
   }
-  ACCUMULATE_SEQ_ROUNDS_TO(SeqRoundsPre);
+  ACCUMULATE_SEQ_ROUNDS_INTO(LinearPhaseRoundBucket());
   const auto he_ct_return = sci::HELinearOnlineDifference(
       sci::GetHELinearOnlineMetrics(), he_online_before);
   BatchNormInMilliSec += temp;

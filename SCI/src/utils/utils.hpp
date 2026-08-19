@@ -270,6 +270,16 @@ inline uint64_t all1Mask(int x){
 // segments themselves are sequential. Summing these gives the round count that
 // actually sits on the critical path.
 // Same as ACCUMULATE_SEQ_ROUNDS but attributes the segment to a phase.
+// Same, but into an lvalue chosen at run time, so the phase a segment belongs
+// to can depend on whether the preprocessing model is active.
+#define ACCUMULATE_SEQ_ROUNDS_INTO(lv) { uint64_t __segMax = 0;\
+        for(int __t = 0; __t < ::num_threads; __t++){\
+            uint64_t __d = ::ioArr[__t]->num_recv_rounds - ::seq_rounds_threads[__t];\
+            if (__d > __segMax) __segMax = __d;\
+            ::seq_rounds_threads[__t] = ::ioArr[__t]->num_recv_rounds;\
+        }\
+        ::SequentialRounds += __segMax; (lv) += __segMax; }
+
 #define ACCUMULATE_SEQ_ROUNDS_TO(bucket) { uint64_t __segMax = 0;\
         for(int __t = 0; __t < ::num_threads; __t++){\
             uint64_t __d = ::ioArr[__t]->num_recv_rounds - ::seq_rounds_threads[__t];\
