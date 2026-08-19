@@ -23,6 +23,12 @@ SOFTWARE.
 #ifndef TRIPLE_GENERATOR_H__
 #define TRIPLE_GENERATOR_H__
 #include "OT/emp-ot.h"
+#include <chrono>
+
+// defined in globals.cpp; declared here to avoid pulling in globals.h, which
+// drags SEAL headers into translation units that do not have them
+extern uint64_t TripleGenTimeInMicroSec;
+extern uint64_t TripleGenCommSent;
 
 #define TGEN_PRINT_TIME 1
 #define TGEN_PRINT_COMP 0
@@ -206,6 +212,11 @@ template <typename IO> class TripleGenerator {
 //     TripleGenMethod method = _16KKOT_to_4OT
 // #endif
       ) {
+      // Refilling the bit-triple buffer is input-independent correlated
+      // randomness: preprocessing material. It runs outside every layer timer,
+      // so account for it explicitly here.
+      const auto __tg_start = std::chrono::high_resolution_clock::now();
+      const uint64_t __tg_comm0 = io->counter;
       _Bai = new uint8_t[_buffBytes];
       _Bbi = new uint8_t[_buffBytes];
       _Bci = new uint8_t[_buffBytes];
@@ -225,6 +236,11 @@ template <typename IO> class TripleGenerator {
       _buffPtr = 0;
       _buffEnable  = true;
       _nRefill++;
+      TripleGenTimeInMicroSec +=
+          std::chrono::duration_cast<std::chrono::microseconds>(
+              std::chrono::high_resolution_clock::now() - __tg_start)
+              .count();
+      TripleGenCommSent += (io->counter - __tg_comm0);
     }
 
     /* get triples from the buffer

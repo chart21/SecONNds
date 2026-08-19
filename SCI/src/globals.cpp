@@ -88,6 +88,8 @@ uint64_t SequentialRounds = 0;
 uint64_t SeqRoundsPre = 0;
 uint64_t SeqRoundsOnline = 0;
 uint64_t SeqSetupRounds = 0;
+uint64_t TripleGenTimeInMicroSec = 0;
+uint64_t TripleGenCommSent = 0;
 std::chrono::high_resolution_clock::time_point program_start_time =
     std::chrono::high_resolution_clock::now();
 uint64_t ConvRounds = 0;

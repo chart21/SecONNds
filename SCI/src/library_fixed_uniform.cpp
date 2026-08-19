@@ -2309,7 +2309,11 @@ void StartComputation(bool use_heliks, bool use_low_round) {
             std::chrono::high_resolution_clock::now() - setup_start)
             .count();
 
-    std::cout << "OT setup: runtime = [" << (OTSetupTimeInMicroSec / 1000000.0)
+    std::cout << "Triple generation (preprocessing material): runtime = ["
+            << (TripleGenTimeInMicroSec / 1000000.0)
+            << "] seconds, communication sent = ["
+            << (TripleGenCommSent / 1024. / 1024.) << "] MiB" << std::endl;
+  std::cout << "OT setup: runtime = [" << (OTSetupTimeInMicroSec / 1000000.0)
               << "] seconds, communication sent = ["
               << (OTSetupCommSent / 1024. / 1024.) << "] MiB" << std::endl;
   }
@@ -2374,15 +2378,24 @@ void EndComputation() {
   // preprocessing; the online phase is the HE->MPC conversion plus every
   // OT-based non-linear layer.
   // Linear-layer preprocessing that happens inside the measured execution.
+  // Without the preprocessing change the linear layers are online work: they
+  // are input-dependent and run inline. Only genuinely input-independent work
+  // (setup, filter/NTT encoding, triple generation) is preprocessing then.
+  const bool preprocessing_model =
+      std::getenv("SKIP_HE2MPC_CONVERSION") == nullptr;
   const uint64_t linear_preprocessing_time_microseconds =
-      1000ULL * (ConvTimeInMilliSec + MatMulTimeInMilliSec + BatchNormInMilliSec);
+      preprocessing_model
+          ? 1000ULL * (ConvTimeInMilliSec + MatMulTimeInMilliSec +
+                       BatchNormInMilliSec)
+          : 0;
   // The filter/NTT encoding runs before StartComputation() starts the clock, so
   // it counts as preprocessing but is not part of execTimeInMilliSec and must
   // not be subtracted from it when deriving the online time.
   const uint64_t offline_encoding_time_microseconds =
-      1000ULL * ConvOffTimeInMilliSec;
+      1000ULL * ConvOffTimeInMilliSec + TripleGenTimeInMicroSec;
   const uint64_t linear_preprocessing_sent_bytes =
-      ConvCommSent + MatMulCommSent + BatchNormCommSent;
+      preprocessing_model ? (ConvCommSent + MatMulCommSent + BatchNormCommSent)
+                          : 0;
   const uint64_t total_preprocessing_time_microseconds =
       OTSetupTimeInMicroSec + offline_encoding_time_microseconds +
       linear_preprocessing_time_microseconds;
@@ -2401,7 +2414,7 @@ void EndComputation() {
   // A communication round is one point where this party stops and waits for the
   // peer before it can continue, i.e. one switch into a receive phase.
   const uint64_t linear_preprocessing_rounds =
-      ConvRounds + MatMulRounds + BatchNormRounds;
+      preprocessing_model ? (ConvRounds + MatMulRounds + BatchNormRounds) : 0;
   const uint64_t total_preprocessing_rounds =
       SetupRounds + linear_preprocessing_rounds;
   const uint64_t total_online_rounds =

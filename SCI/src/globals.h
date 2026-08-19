@@ -121,6 +121,8 @@ extern uint64_t SequentialRounds;
 extern uint64_t SeqRoundsPre;
 extern uint64_t SeqRoundsOnline;
 extern uint64_t SeqSetupRounds;
+extern uint64_t TripleGenTimeInMicroSec;
+extern uint64_t TripleGenCommSent;
 extern std::chrono::high_resolution_clock::time_point program_start_time;
 extern uint64_t ConvRounds;
 extern uint64_t MatMulRounds;
