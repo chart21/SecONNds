@@ -132,6 +132,10 @@ inline uint64_t &LinearPhaseRoundBucket() {
 extern uint64_t TripleGenTimeInMicroSec;
 extern uint64_t TripleGenCommSent;
 extern uint64_t TripleGenCalls;
+extern uint64_t TripleGenFillCalls;
+extern uint64_t TripleGenFillComm;
+extern uint64_t TripleGenFlyCalls;
+extern uint64_t TripleGenFlyComm;
 extern std::chrono::high_resolution_clock::time_point program_start_time;
 extern uint64_t ConvRounds;
 extern uint64_t MatMulRounds;

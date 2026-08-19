@@ -30,6 +30,10 @@ SOFTWARE.
 extern uint64_t TripleGenTimeInMicroSec;
 extern uint64_t TripleGenCommSent;
 extern uint64_t TripleGenCalls;
+extern uint64_t TripleGenFillCalls;
+extern uint64_t TripleGenFillComm;
+extern uint64_t TripleGenFlyCalls;
+extern uint64_t TripleGenFlyComm;
 
 #define TGEN_PRINT_TIME 1
 #define TGEN_PRINT_COMP 0
@@ -217,6 +221,7 @@ template <typename IO> class TripleGenerator {
       _Bbi = new uint8_t[_buffBytes];
       _Bci = new uint8_t[_buffBytes];
 
+      _inRefill = true;
       _chunkSize = std::min(_buffSize, _chunkSize);
       int nChunks = ceil((double)_buffSize / _chunkSize);
       for (int i = 0; i < nChunks; i++) {
@@ -229,6 +234,7 @@ template <typename IO> class TripleGenerator {
                   _Bci + startBytes,
                   end - start, method, true);
       }
+      _inRefill = false;
       _buffPtr = 0;
       _buffEnable  = true;
       _nRefill++;
@@ -347,6 +353,7 @@ template <typename IO> class TripleGenerator {
 
   private:
     // Buffer implementation to use pre-generated triples from the offline phase
+    bool _inRefill = false;  // true while filling the buffer
     uint8_t *_Bai;   // Buffer for Ai
     uint8_t *_Bbi;   // Buffer for Bi
     uint8_t *_Bci;   // Buffer for Ci
@@ -367,17 +374,22 @@ template <typename IO> class TripleGenerator {
       std::chrono::high_resolution_clock::time_point t0;
       uint64_t c0;
       IO *io_;
-      explicit TripleGenScope(IO *io)
+      bool fill_;
+      TripleGenScope(IO *io, bool fill)
           : t0(std::chrono::high_resolution_clock::now()),
             c0(io->counter),
-            io_(io) {}
+            io_(io),
+            fill_(fill) {}
       ~TripleGenScope() {
         TripleGenTimeInMicroSec +=
             std::chrono::duration_cast<std::chrono::microseconds>(
                 std::chrono::high_resolution_clock::now() - t0)
                 .count();
-        TripleGenCommSent += (io_->counter - c0);
+        const uint64_t bytes = io_->counter - c0;
+        TripleGenCommSent += bytes;
         TripleGenCalls++;
+        if (fill_) { TripleGenFillCalls++; TripleGenFillComm += bytes; }
+        else       { TripleGenFlyCalls++;  TripleGenFlyComm  += bytes; }
       }
     };
 
@@ -386,7 +398,7 @@ template <typename IO> class TripleGenerator {
                   int offset = 1) {
       if (!num_triples)
         return;
-      TripleGenScope __tg(io);
+      TripleGenScope __tg(io, _inRefill);
       switch (method) {
         case Ideal: {
           int num_bytes = ceil((double)num_triples / 8);

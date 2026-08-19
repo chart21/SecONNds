@@ -2309,7 +2309,11 @@ void StartComputation(bool use_heliks, bool use_low_round) {
             std::chrono::high_resolution_clock::now() - setup_start)
             .count();
 
-    std::cout << "Triple generation (" << TripleGenCalls
+    std::cout << "  triples: buffer-fill " << TripleGenFillCalls << " calls / "
+            << (TripleGenFillComm / 1024. / 1024.) << " MiB sent; on-the-fly "
+            << TripleGenFlyCalls << " calls / "
+            << (TripleGenFlyComm / 1024. / 1024.) << " MiB sent" << std::endl;
+  std::cout << "Triple generation (" << TripleGenCalls
             << " calls, buffer fill + on-the-fly; summed over " << num_threads
             << " threads, i.e. ~"
             << (TripleGenTimeInMicroSec / 1000000.0 / (num_threads ? num_threads : 1))
