@@ -2357,6 +2357,11 @@ void EndComputation() {
       std::chrono::duration_cast<std::chrono::milliseconds>(endTimer -
                                                             start_time)
           .count();
+  const auto totalTimeInclSetupMs =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::high_resolution_clock::now() - program_start_time)
+          .count();
+  const auto totalTimeInclSetup = totalTimeInclSetupMs;
   uint64_t totalComm = 0;
   uint64_t totalRounds = 0;
   uint64_t maxThreadRounds = 0;
@@ -2408,9 +2413,17 @@ void EndComputation() {
   const uint64_t linear_preprocessing_sent_bytes =
       preprocessing_model ? (ConvCommSent + MatMulCommSent + BatchNormCommSent)
                           : 0;
+  // Preprocessing is everything before the execution clock starts (connection,
+  // key exchange, base OT, silent-OT setup, triple buffer fill, filter/NTT
+  // encoding) plus, under the preprocessing model, the HE linear layers. The
+  // earlier formula counted only the OT setup call and the encoding, missing
+  // the bulk of the setup window.
+  const uint64_t setup_window_microseconds =
+      1000ULL * (totalTimeInclSetupMs > execTimeInMilliSec
+                     ? (totalTimeInclSetupMs - execTimeInMilliSec)
+                     : 0);
   const uint64_t total_preprocessing_time_microseconds =
-      OTSetupTimeInMicroSec + offline_encoding_time_microseconds +
-      linear_preprocessing_time_microseconds;
+      setup_window_microseconds + linear_preprocessing_time_microseconds;
   (void)OTSetupRounds;
   const uint64_t total_preprocessing_sent_bytes =
       SetupCommSent + linear_preprocessing_sent_bytes;
@@ -2436,10 +2449,7 @@ void EndComputation() {
   std::cout << "------------------------------------------------------\n";
   std::cout << "------------------------------------------------------\n";
   std::cout << "------------------------------------------------------\n";
-  const auto totalTimeInclSetup =
-      std::chrono::duration_cast<std::chrono::milliseconds>(
-          std::chrono::high_resolution_clock::now() - program_start_time)
-          .count();
+
   std::cout << "Total time taken = " << totalTimeInclSetup
             << " milliseconds (incl. setup).\n";
   std::cout << "  execution window only (excl. setup) = " << execTimeInMilliSec
@@ -2537,16 +2547,31 @@ void EndComputation() {
 #ifdef LOG_LAYERWISE
   std::cout << "Total time in Conv Offline = " << (ConvOffTimeInMilliSec / 1000.0)
             << " seconds." << std::endl;
-  std::cout << "Total time in Conv (preprocessing) = "
-            << (ConvTimeInMilliSec / 1000.0) << " seconds." << std::endl;
-  std::cout << "Total CONV online runtime = "
-            << (ConvOnlineTimeInMicroSec / 1000000.0) << " seconds."
+  // Without the preprocessing change the HE linear layers are online work, so
+  // report their time and bytes there rather than under preprocessing.
+  const double conv_pre_s = preprocessing_model ? ConvTimeInMilliSec / 1000.0 : 0.0;
+  const double fc_pre_s   = preprocessing_model ? MatMulTimeInMilliSec / 1000.0 : 0.0;
+  const double bn_pre_s   = preprocessing_model ? BatchNormInMilliSec / 1000.0 : 0.0;
+  const double conv_on_s  = preprocessing_model
+                              ? ConvOnlineTimeInMicroSec / 1000000.0
+                              : ConvTimeInMilliSec / 1000.0;
+  const double fc_on_s    = preprocessing_model
+                              ? MatMulOnlineTimeInMicroSec / 1000000.0
+                              : MatMulTimeInMilliSec / 1000.0;
+  const double bn_on_s    = preprocessing_model
+                              ? BatchNormOnlineTimeInMicroSec / 1000000.0
+                              : BatchNormInMilliSec / 1000.0;
+  std::cout << "Total CONV preprocessing runtime = " << conv_pre_s
+            << " seconds." << std::endl;
+  std::cout << "Total CONV online runtime = " << conv_on_s << " seconds."
             << std::endl;
-  std::cout << "Total FC online runtime = "
-            << (MatMulOnlineTimeInMicroSec / 1000000.0) << " seconds."
+  std::cout << "Total FC preprocessing runtime = " << fc_pre_s << " seconds."
             << std::endl;
-  std::cout << "Total BN online runtime = "
-            << (BatchNormOnlineTimeInMicroSec / 1000000.0) << " seconds."
+  std::cout << "Total FC online runtime = " << fc_on_s << " seconds."
+            << std::endl;
+  std::cout << "Total BN preprocessing runtime = " << bn_pre_s << " seconds."
+            << std::endl;
+  std::cout << "Total BN online runtime = " << bn_on_s << " seconds."
             << std::endl;
   std::cout << "Total time in MatMul = " << (MatMulTimeInMilliSec / 1000.0)
             << " seconds." << std::endl;
@@ -2580,11 +2605,13 @@ void EndComputation() {
   std::cout << "Total time in NormaliseL2 = "
             << (NormaliseL2TimeInMilliSec / 1000.0) << " seconds." << std::endl;
   std::cout << "------------------------------------------------------\n";
+  const uint64_t conv_pre_c = preprocessing_model ? ConvCommSent : 0;
+  const uint64_t conv_on_c =
+      preprocessing_model ? ConvOnlineCommSent : ConvCommSent;
   std::cout << "Conv preprocessing data sent = "
-            << ((ConvCommSent) / (1.0 * (1ULL << 20))) << " MiB." << std::endl;
+            << (conv_pre_c / (1.0 * (1ULL << 20))) << " MiB." << std::endl;
   std::cout << "Conv online data sent = "
-            << ((ConvOnlineCommSent) / (1.0 * (1ULL << 20))) << " MiB."
-            << std::endl;
+            << (conv_on_c / (1.0 * (1ULL << 20))) << " MiB." << std::endl;
   std::cout << "MatMul online data sent = "
             << ((MatMulOnlineCommSent) / (1.0 * (1ULL << 20))) << " MiB."
             << std::endl;
